@@ -1,0 +1,68 @@
+datasource db {
+  provider = "mysql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. Users Table (Admin & Cashier Staff Management)
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  fullName     String?  
+  passwordHash String
+  role         Role     @default(CASHIER) // ADMIN or CASHIER
+  isActive     Boolean  @default(true)    
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  orders       Order[]  
+}
+
+enum Role {
+  ADMIN
+  CASHIER
+}
+
+// 2. Menu Items Table (Images, Pricing, Categories, Availability)
+model MenuItem {
+  id          Int         @id @default(autoincrement())
+  name        String
+  description String?
+  price       Decimal     @db.Decimal(10, 2)
+  category    String      // e.g., 'Beverages', 'Main Meals', 'Snacks'
+  imageUrl    String?     
+  isAvailable Boolean     @default(true) 
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  orderItems  OrderItem[]
+}
+
+// 3. Orders Table (Checkout & Reporting)
+model Order {
+  id            Int         @id @default(autoincrement())
+  totalAmount   Decimal     @db.Decimal(10, 2)
+  paymentMethod String      @default("CASH") // e.g., 'CASH', 'CARD'
+  status        OrderStatus @default(COMPLETED)
+  createdAt     DateTime    @default(now())
+  userId        Int         
+  user          User        @relation(fields: [userId], references: [id])
+  orderItems    OrderItem[]
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+// 4. Order Items Table (Cart Items)
+model OrderItem {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId Int
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  quantity   Int
+  price      Decimal  @db.Decimal(10, 2)
+}
