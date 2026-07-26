@@ -14,6 +14,9 @@ app.get('/', (req, res) => {
     res.json({ message: "Cafeteria POS API is running" });
 });
 
+// Routes
+app.use('/api/auth', require('./routes/authRoutes.js'));
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
