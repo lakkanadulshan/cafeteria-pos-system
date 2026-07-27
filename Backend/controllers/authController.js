@@ -4,14 +4,22 @@ const jwt = require('jsonwebtoken');
 
 const prisma = new PrismaClient();
 
+// Email format එක check කරන regex pattern එක
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // User Registration 
 const registerUser = async (req, res) => {
   try {
-    const { username, fullName, password, role } = req.body;
+    const { email, fullName, password, role } = req.body;
 
     // 1. Basic Validation
-    if (!username || !fullName || !password) {
+    if (!email || !fullName || !password) {
       return res.status(400).json({ message: "Please fill all required fields" });
+    }
+
+    // Email format validation
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Please enter a valid email address" });
     }
 
     if (password.length < 8) {
@@ -22,13 +30,13 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: "Name can only contain letters and spaces" });
     }
 
-    // 2. Check if Username already exists
+    // 2. Check if Email already exists
     const existingUser = await prisma.user.findUnique({
-      where: { username }
+      where: { email }
     });
 
     if (existingUser) {
-      return res.status(400).json({ message: "Username already taken" });
+      return res.status(400).json({ message: "Email is already registered" });
     }
 
     // 3. Hash the Password
@@ -37,10 +45,10 @@ const registerUser = async (req, res) => {
     // 4. Create User in Database
     const user = await prisma.user.create({
       data: {
-        username,
+        email,
         fullName,
-        passwordHash: hashedPassword, // Database schema field name
-        role: role || 'CASHIER',       // Default to CASHIER if not provided
+        passwordHash: hashedPassword,
+        role: role || 'CASHIER',
         isActive: true
       }
     });
@@ -49,7 +57,7 @@ const registerUser = async (req, res) => {
     const token = jwt.sign(
       { 
         userId: user.id, 
-        username: user.username, 
+        email: user.email, 
         role: user.role 
       },
       process.env.JWT_SECRET,
@@ -62,7 +70,7 @@ const registerUser = async (req, res) => {
       token,
       user: {
         id: user.id,
-        username: user.username,
+        email: user.email,
         fullName: user.fullName,
         role: user.role
       }
@@ -74,20 +82,20 @@ const registerUser = async (req, res) => {
   }
 };
 
-// user login
+// User Login
 const LoginUser = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
     // 1. Validation
-    if (!username || !password) {
-      return res.status(400).json({ message: "Please provide both username and password" });
+    if (!email || !password) {
+      return res.status(400).json({ message: "Please provide both email and password" });
     }
 
-    // 2. Find User
-    const user = await prisma.user.findUnique({ where: { username } });
+    // 2. Find User by Email
+    const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return res.status(401).json({ message: "Invalid username or password" });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     // 3. Check if user account is active
@@ -98,12 +106,12 @@ const LoginUser = async (req, res) => {
     // 4. Compare Password
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid username or password" });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     // 5. Generate JWT Token
     const token = jwt.sign(
-      { userId: user.id, username: user.username, role: user.role },
+      { userId: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '8h' }
     );
@@ -114,7 +122,7 @@ const LoginUser = async (req, res) => {
       token,
       user: {
         id: user.id,
-        username: user.username,
+        email: user.email,
         fullName: user.fullName,
         role: user.role
       }
@@ -125,6 +133,5 @@ const LoginUser = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
-
 
 module.exports = { registerUser, LoginUser };

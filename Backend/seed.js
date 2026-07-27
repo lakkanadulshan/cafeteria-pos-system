@@ -8,14 +8,14 @@ async function main() {
   console.log('Seeding database...');
 
   try {
-    // 1. Admin Password Hash
+    // 1. Admin Account Seed
     const adminPassword = await bcrypt.hash('admin123', 10);
 
     const admin = await prisma.user.upsert({
-      where: { username: 'admin' },
+      where: { email: 'admin@cafeteria.com' },
       update: {},
       create: {
-        username: 'admin',
+        email: 'admin@cafeteria.com',
         fullName: 'System Administrator',
         passwordHash: adminPassword,
         role: 'ADMIN',
@@ -23,16 +23,16 @@ async function main() {
       },
     });
 
-    console.log('✅ Admin user created:', admin.username);
+    console.log('Admin user created/verified:', admin.email);
 
-    // 2. Cashier Password Hash
+    // 2. Cashier Account Seed
     const cashierPassword = await bcrypt.hash('cashier123', 10);
 
     const cashier = await prisma.user.upsert({
-      where: { username: 'cashier1' },
+      where: { email: 'cashier1@cafeteria.com' },
       update: {},
       create: {
-        username: 'cashier1',
+        email: 'cashier1@cafeteria.com',
         fullName: 'Nimal Perera',
         passwordHash: cashierPassword,
         role: 'CASHIER',
@@ -40,9 +40,9 @@ async function main() {
       },
     });
 
-    console.log('✅ Cashier user created:', cashier.username);
+    console.log('Cashier user created/verified:', cashier.email);
 
-    // 3. Sample Menu Items
+    // 3. Sample Menu Items Seed
     const items = [
       { name: 'Chicken Burger', category: 'Snacks', price: 850.00, description: 'Crispy chicken patty with cheese', isAvailable: true },
       { name: 'Iced Coffee', category: 'Beverages', price: 350.00, description: 'Cold brewed coffee with milk', isAvailable: true },
@@ -50,12 +50,19 @@ async function main() {
     ];
 
     for (const item of items) {
-      await prisma.menuItem.create({ data: item });
+      const existingItem = await prisma.menuItem.findFirst({
+        where: { name: item.name }
+      });
+
+      if (!existingItem) {
+        await prisma.menuItem.create({ data: item });
+      }
     }
 
-    console.log('✅ Sample menu items created!');
+    console.log('Sample menu items processed!');
+
   } catch (error) {
-    console.error('Error seeding data:', error);
+    console.error(' Error seeding data:', error);
   } finally {
     await prisma.$disconnect();
   }

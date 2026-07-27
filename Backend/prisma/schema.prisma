@@ -10,14 +10,14 @@ generator client {
 // 1. Users Table (Admin & Cashier Staff Management)
 model User {
   id           Int      @id @default(autoincrement())
-  username     String   @unique
-  fullName     String?  
+  email        String   @unique
+  fullName     String?
   passwordHash String
   role         Role     @default(CASHIER) // ADMIN or CASHIER
-  isActive     Boolean  @default(true)    
+  isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  orders       Order[]  
+  orders       Order[]
 }
 
 enum Role {
@@ -25,28 +25,41 @@ enum Role {
   CASHIER
 }
 
-// 2. Menu Items Table (Images, Pricing, Categories, Availability)
+// 2. Category Table 
+model Category {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  menuItems MenuItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+// 3. Menu Items Table 
 model MenuItem {
   id          Int         @id @default(autoincrement())
   name        String
   description String?
   price       Decimal     @db.Decimal(10, 2)
-  category    String      // e.g., 'Beverages', 'Main Meals', 'Snacks'
-  imageUrl    String?     
-  isAvailable Boolean     @default(true) 
+  imageUrl    String?
+  isAvailable Boolean     @default(true)
+  
+  // Category Relation
+  categoryId  Int
+  category    Category    @relation(fields: [categoryId], references: [id])
+  
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   orderItems  OrderItem[]
 }
 
-// 3. Orders Table (Checkout & Reporting)
+// 4. Orders Table (Checkout & Reporting)
 model Order {
   id            Int         @id @default(autoincrement())
   totalAmount   Decimal     @db.Decimal(10, 2)
   paymentMethod String      @default("CASH") // e.g., 'CASH', 'CARD'
   status        OrderStatus @default(COMPLETED)
   createdAt     DateTime    @default(now())
-  userId        Int         
+  userId        Int
   user          User        @relation(fields: [userId], references: [id])
   orderItems    OrderItem[]
 }
@@ -57,7 +70,7 @@ enum OrderStatus {
   CANCELLED
 }
 
-// 4. Order Items Table (Cart Items)
+// 5. Order Items Table (Cart Items)
 model OrderItem {
   id         Int      @id @default(autoincrement())
   orderId    Int
