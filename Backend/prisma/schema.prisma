@@ -9,15 +9,18 @@ generator client {
 
 // 1. Users Table (Admin & Cashier Staff Management)
 model User {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique
-  fullName     String?
-  passwordHash String
-  role         Role     @default(CASHIER) // ADMIN or CASHIER
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  orders       Order[]
+  id                Int       @id @default(autoincrement())
+  email             String    @unique
+  fullName          String?
+  passwordHash      String
+  role              Role      @default(CASHIER) // ADMIN or CASHIER
+  isActive          Boolean   @default(false)   
+  isVerified        Boolean   @default(false)   
+  verificationToken String?
+  tokenExpiresAt    DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  orders            Order[]
 }
 
 enum Role {
