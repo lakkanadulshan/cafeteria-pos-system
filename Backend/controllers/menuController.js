@@ -1,4 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 // 1. Get All Menu Items (With Category & Availability Filter)
@@ -14,15 +14,15 @@ const getAllMenuItems = async (req, res) => {
     }
 
     if (isAvailable !== undefined) {
-      whereClause.isAvailable = isAvailable === 'true';
+      whereClause.isAvailable = isAvailable === "true";
     }
 
     const menuItems = await prisma.menuItem.findMany({
       where: whereClause,
       include: {
-        category: true
+        category: true,
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: "desc" },
     });
 
     return res.status(200).json(menuItems);
@@ -45,8 +45,8 @@ const getMenuItemById = async (req, res) => {
     const menuItem = await prisma.menuItem.findUnique({
       where: { id: menuItemId },
       include: {
-        category: true
-      }
+        category: true,
+      },
     });
 
     if (!menuItem) {
@@ -63,18 +63,23 @@ const getMenuItemById = async (req, res) => {
 // 3. Create New Menu Item (Admin Only)
 const createMenuItem = async (req, res) => {
   try {
-    const { name, description, price, categoryId, imageUrl, isAvailable } = req.body;
+    const { name, description, price, categoryId, imageUrl, isAvailable } =
+      req.body;
 
     if (!name || price === undefined || !categoryId) {
-      return res.status(400).json({ message: "Name, price, and categoryId are required" });
+      return res
+        .status(400)
+        .json({ message: "Name, price, and categoryId are required" });
     }
 
     const existingCategory = await prisma.category.findUnique({
-      where: { id: parseInt(categoryId, 10) }
+      where: { id: parseInt(categoryId, 10) },
     });
 
     if (!existingCategory) {
-      return res.status(404).json({ message: "Specified Category does not exist" });
+      return res
+        .status(404)
+        .json({ message: "Specified Category does not exist" });
     }
 
     const newItem = await prisma.menuItem.create({
@@ -84,20 +89,24 @@ const createMenuItem = async (req, res) => {
         price: parseFloat(price),
         categoryId: parseInt(categoryId, 10),
         imageUrl,
-        isAvailable: isAvailable !== undefined ? Boolean(isAvailable) : true
+        isAvailable: isAvailable !== undefined ? Boolean(isAvailable) : true,
       },
       include: {
-        category: true
-      }
+        category: true,
+      },
     });
 
     return res.status(201).json({
       message: "Menu item created successfully",
-      item: newItem
+      item: newItem,
     });
   } catch (error) {
     console.error("Error creating menu item:", error);
     return res.status(500).json({ message: "Internal server error" });
+  }
+  let imageUrl = req.body.imageUrl || null;
+  if (req.file) {
+    imageUrl = `/uploads/${req.file.filename}`;
   }
 };
 
@@ -111,10 +120,11 @@ const updateMenuItem = async (req, res) => {
       return res.status(400).json({ message: "Invalid Menu Item ID provided" });
     }
 
-    const { name, description, price, categoryId, imageUrl, isAvailable } = req.body;
+    const { name, description, price, categoryId, imageUrl, isAvailable } =
+      req.body;
 
     const existingItem = await prisma.menuItem.findUnique({
-      where: { id: menuItemId }
+      where: { id: menuItemId },
     });
 
     if (!existingItem) {
@@ -123,10 +133,12 @@ const updateMenuItem = async (req, res) => {
 
     if (categoryId) {
       const existingCategory = await prisma.category.findUnique({
-        where: { id: parseInt(categoryId, 10) }
+        where: { id: parseInt(categoryId, 10) },
       });
       if (!existingCategory) {
-        return res.status(404).json({ message: "Specified Category does not exist" });
+        return res
+          .status(404)
+          .json({ message: "Specified Category does not exist" });
       }
     }
 
@@ -134,24 +146,36 @@ const updateMenuItem = async (req, res) => {
       where: { id: menuItemId },
       data: {
         name: name || existingItem.name,
-        description: description !== undefined ? description : existingItem.description,
+        description:
+          description !== undefined ? description : existingItem.description,
         price: price !== undefined ? parseFloat(price) : existingItem.price,
-        categoryId: categoryId ? parseInt(categoryId, 10) : existingItem.categoryId,
+        categoryId: categoryId
+          ? parseInt(categoryId, 10)
+          : existingItem.categoryId,
         imageUrl: imageUrl !== undefined ? imageUrl : existingItem.imageUrl,
-        isAvailable: isAvailable !== undefined ? Boolean(isAvailable) : existingItem.isAvailable
+        isAvailable:
+          isAvailable !== undefined
+            ? Boolean(isAvailable)
+            : existingItem.isAvailable,
       },
       include: {
-        category: true
-      }
+        category: true,
+      },
     });
 
     return res.status(200).json({
       message: "Menu item updated successfully",
-      item: updatedItem
+      item: updatedItem,
     });
   } catch (error) {
     console.error("Error updating menu item:", error);
     return res.status(500).json({ message: "Internal server error" });
+  }
+  let imageUrl = existingItem.imageUrl;
+  if (req.file) {
+    imageUrl = `/uploads/${req.file.filename}`;
+  } else if (req.body.imageUrl !== undefined) {
+    imageUrl = req.body.imageUrl;
   }
 };
 
@@ -166,7 +190,7 @@ const deleteMenuItem = async (req, res) => {
     }
 
     const existingItem = await prisma.menuItem.findUnique({
-      where: { id: menuItemId }
+      where: { id: menuItemId },
     });
 
     if (!existingItem) {
@@ -174,7 +198,7 @@ const deleteMenuItem = async (req, res) => {
     }
 
     await prisma.menuItem.delete({
-      where: { id: menuItemId }
+      where: { id: menuItemId },
     });
 
     return res.status(200).json({ message: "Menu item deleted successfully" });
@@ -189,5 +213,5 @@ module.exports = {
   getMenuItemById,
   createMenuItem,
   updateMenuItem,
-  deleteMenuItem
+  deleteMenuItem,
 };
