@@ -1,15 +1,16 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+
+// Public Pages
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import VerifyEmail from './pages/VerifyEmail';
+
+// Protected Pages & Components
 import ProtectedRoute from './components/ProtectedRoute';
-import AdminDashboard from './pages/AdminDashboard';
-import MainPage from './pages/PosMain'; 
-const DashboardPlaceholder = () => (
-  <div className="p-8 text-xl font-bold">Welcome to Main POS / Dashboard! (Protected Area)</div>
-);
+import AdminDashboard from './components/admin/AdminDashboard';
+import MainPage from './pages/PosMain';
 
 function App() {
   return (
@@ -21,28 +22,39 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
 
+        {/* Protected Admin Route */}
         <Route
           path="/admin/dashboard"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['ADMIN']}>
               <AdminDashboard />
             </ProtectedRoute>
           }
         />
 
+        {/* Protected Cashier POS Terminal Route */}
         <Route
           path="/pos"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['ADMIN', 'CASHIER']}>
               <MainPage />
             </ProtectedRoute>
           }
         />
 
-
-
-        {/* Fallback 404 */}
-        <Route path="*" element={<div className="p-8 text-xl font-bold">404 - Page Not Found</div>} />
+        {/* Fallback 404 Route */}
+        <Route 
+          path="*" 
+          element={
+            <div className="min-h-screen bg-slate-100 flex items-center justify-center p-8">
+              <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm text-center space-y-2">
+                <h1 className="text-4xl font-black text-purple-600">404</h1>
+                <p className="text-sm font-bold text-slate-700">Page Not Found</p>
+                <p className="text-xs text-slate-400">The page you are looking for does not exist.</p>
+              </div>
+            </div>
+          } 
+        />
       </Routes>
     </Router>
   );
