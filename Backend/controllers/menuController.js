@@ -1,12 +1,10 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
-// 1. Get All Menu Items (With Category & Availability Filter)
+// 1. Get All Menu Items
 const getAllMenuItems = async (req, res) => {
   try {
     const { categoryId, isAvailable } = req.query;
-
-    // Dynamically build filter object
     const whereClause = {};
 
     if (categoryId) {
@@ -19,9 +17,7 @@ const getAllMenuItems = async (req, res) => {
 
     const menuItems = await prisma.menuItem.findMany({
       where: whereClause,
-      include: {
-        category: true,
-      },
+      include: { category: true },
       orderBy: { createdAt: "desc" },
     });
 
@@ -44,9 +40,7 @@ const getMenuItemById = async (req, res) => {
 
     const menuItem = await prisma.menuItem.findUnique({
       where: { id: menuItemId },
-      include: {
-        category: true,
-      },
+      include: { category: true },
     });
 
     if (!menuItem) {
@@ -63,8 +57,7 @@ const getMenuItemById = async (req, res) => {
 // 3. Create New Menu Item (Admin Only)
 const createMenuItem = async (req, res) => {
   try {
-    const { name, description, price, categoryId, imageUrl, isAvailable } =
-      req.body;
+    const { name, description, price, categoryId, stock, isAvailable } = req.body;
 
     if (!name || price === undefined || !categoryId) {
       return res
@@ -82,18 +75,29 @@ const createMenuItem = async (req, res) => {
         .json({ message: "Specified Category does not exist" });
     }
 
+    let imageUrl = req.body.imageUrl || null;
+    if (req.file) {
+      imageUrl = `/uploads/${req.file.filename}`;
+    }
+
+    const parsedStock = stock !== undefined ? parseInt(stock, 10) : 0;
+    
+    // FIX: String boolean validation for form-data
+    const parsedAvailability = isAvailable !== undefined 
+      ? (isAvailable === true || isAvailable === "true") 
+      : parsedStock > 0;
+
     const newItem = await prisma.menuItem.create({
       data: {
         name,
-        description,
+        description: description || null,
         price: parseFloat(price),
+        stock: parsedStock,
         categoryId: parseInt(categoryId, 10),
         imageUrl,
-        isAvailable: isAvailable !== undefined ? Boolean(isAvailable) : true,
+        isAvailable: parsedAvailability,
       },
-      include: {
-        category: true,
-      },
+      include: { category: true },
     });
 
     return res.status(201).json({
@@ -103,10 +107,6 @@ const createMenuItem = async (req, res) => {
   } catch (error) {
     console.error("Error creating menu item:", error);
     return res.status(500).json({ message: "Internal server error" });
-  }
-  let imageUrl = req.body.imageUrl || null;
-  if (req.file) {
-    imageUrl = `/uploads/${req.file.filename}`;
   }
 };
 
@@ -120,8 +120,7 @@ const updateMenuItem = async (req, res) => {
       return res.status(400).json({ message: "Invalid Menu Item ID provided" });
     }
 
-    const { name, description, price, categoryId, imageUrl, isAvailable } =
-      req.body;
+    const { name, description, price, categoryId, stock, isAvailable } = req.body;
 
     const existingItem = await prisma.menuItem.findUnique({
       where: { id: menuItemId },
@@ -142,25 +141,36 @@ const updateMenuItem = async (req, res) => {
       }
     }
 
+    let imageUrl = existingItem.imageUrl;
+    if (req.file) {
+      imageUrl = `/uploads/${req.file.filename}`;
+    } else if (req.body.imageUrl !== undefined) {
+      imageUrl = req.body.imageUrl;
+    }
+
+    const parsedStock = stock !== undefined ? parseInt(stock, 10) : existingItem.stock;
+    
+    // FIX: Safe string to boolean parsing for form-data
+    let parsedAvailability = existingItem.isAvailable;
+    if (isAvailable !== undefined) {
+      parsedAvailability = (isAvailable === true || isAvailable === "true");
+    } else if (stock !== undefined) {
+      // Auto enable if stock updated above 0, or disable if 0
+      parsedAvailability = parsedStock > 0;
+    }
+
     const updatedItem = await prisma.menuItem.update({
       where: { id: menuItemId },
       data: {
         name: name || existingItem.name,
-        description:
-          description !== undefined ? description : existingItem.description,
+        description: description !== undefined ? description : existingItem.description,
         price: price !== undefined ? parseFloat(price) : existingItem.price,
-        categoryId: categoryId
-          ? parseInt(categoryId, 10)
-          : existingItem.categoryId,
-        imageUrl: imageUrl !== undefined ? imageUrl : existingItem.imageUrl,
-        isAvailable:
-          isAvailable !== undefined
-            ? Boolean(isAvailable)
-            : existingItem.isAvailable,
+        stock: parsedStock,
+        categoryId: categoryId ? parseInt(categoryId, 10) : existingItem.categoryId,
+        imageUrl: imageUrl,
+        isAvailable: parsedAvailability,
       },
-      include: {
-        category: true,
-      },
+      include: { category: true },
     });
 
     return res.status(200).json({
@@ -170,12 +180,6 @@ const updateMenuItem = async (req, res) => {
   } catch (error) {
     console.error("Error updating menu item:", error);
     return res.status(500).json({ message: "Internal server error" });
-  }
-  let imageUrl = existingItem.imageUrl;
-  if (req.file) {
-    imageUrl = `/uploads/${req.file.filename}`;
-  } else if (req.body.imageUrl !== undefined) {
-    imageUrl = req.body.imageUrl;
   }
 };
 

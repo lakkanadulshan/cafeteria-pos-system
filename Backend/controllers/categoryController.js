@@ -12,8 +12,9 @@ exports.createCategory = async (req, res) => {
 
     name = name.trim();
 
+    // Direct equality match without 'mode: insensitive' (works in MySQL)
     const existingCategory = await prisma.category.findFirst({
-      where: { name: { equals: name, mode: 'insensitive' } }
+      where: { name: name }
     });
 
     if (existingCategory) {
@@ -26,11 +27,12 @@ exports.createCategory = async (req, res) => {
 
     return res.status(201).json({ message: "Category created successfully", category });
   } catch (error) {
+    console.error("Error creating category:", error);
     return res.status(500).json({ message: "Error creating category", error: error.message });
   }
 };
 
-// 2. Get All Categories (With Menu Items Count)
+// 2. Get All Categories
 exports.getAllCategories = async (req, res) => {
   try {
     const categories = await prisma.category.findMany({
@@ -44,10 +46,8 @@ exports.getAllCategories = async (req, res) => {
 
     return res.status(200).json(categories);
   } catch (error) {
-    return res.status(500).json({ 
-      message: "Error fetching categories", 
-      error: error.message 
-    });
+    console.error("Error fetching categories:", error);
+    return res.status(500).json({ message: "Error fetching categories", error: error.message });
   }
 };
 
@@ -57,7 +57,10 @@ exports.deleteCategory = async (req, res) => {
     const { id } = req.params;
     const categoryId = parseInt(id, 10);
 
-    // Check if category has linked food items
+    if (isNaN(categoryId)) {
+      return res.status(400).json({ message: "Invalid Category ID" });
+    }
+
     const category = await prisma.category.findUnique({
       where: { id: categoryId },
       include: { _count: { select: { menuItems: true } } }
@@ -69,14 +72,15 @@ exports.deleteCategory = async (req, res) => {
 
     if (category._count.menuItems > 0) {
       return res.status(400).json({ 
-        message: "Cannot delete category because it contains active food items. Remove or reassign those items first." 
+        message: "Cannot delete category because it contains active food items." 
       });
     }
 
-    await prisma.category.delete({ where: { id: categoryId } });
+    await prisma.delete({ where: { id: categoryId } });
     return res.status(200).json({ message: "Category deleted successfully" });
 
   } catch (error) {
+    console.error("Error deleting category:", error);
     return res.status(500).json({ message: "Error deleting category", error: error.message });
   }
 };
