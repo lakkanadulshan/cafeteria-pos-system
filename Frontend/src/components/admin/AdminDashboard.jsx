@@ -24,7 +24,8 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  MonitorPlay
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -101,7 +102,17 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Open POS Terminal Navigation Button */}
+          <button
+            onClick={() => navigate('/pos')}
+            className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 px-3.5 py-2 rounded-xl transition-all text-xs font-bold shadow-sm"
+            title="Switch to Cashier POS View"
+          >
+            <MonitorPlay size={14} />
+            <span className="hidden sm:inline">Open POS Terminal</span>
+          </button>
+
           <div className="hidden sm:flex items-center gap-2 bg-slate-100 px-3.5 py-1.5 rounded-xl border border-slate-200/80">
             <Shield size={14} className="text-purple-600" />
             <span className="text-xs font-bold text-slate-700">{currentUser.fullName || 'Admin'}</span>
@@ -112,7 +123,7 @@ const AdminDashboard = () => {
             className="text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-100 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5"
           >
             <LogOut size={14} />
-            <span>Logout</span>
+            <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
       </nav>

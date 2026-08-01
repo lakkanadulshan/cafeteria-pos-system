@@ -15,13 +15,14 @@ import {
   Banknote,
   CheckCircle2,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  ShieldCheck
 } from 'lucide-react';
 
 // Dynamic backend origin resolution via Axios config
 const BACKEND_ORIGIN = api.defaults.baseURL 
   ? new URL(api.defaults.baseURL).origin 
-  : 'http://localhost:3000';
+  : '{$API}';
 
 const PosMain = () => {
   const navigate = useNavigate();
@@ -172,7 +173,20 @@ const PosMain = () => {
         </div>
 
         {/* User Info & Actions */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          
+          {/* Admin Dashboard Button (Only visible if user role is ADMIN) */}
+          {user.role === 'ADMIN' && (
+            <button
+              onClick={() => navigate('/admin/dashboard')}
+              className="flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 px-3.5 py-2 rounded-2xl border border-purple-200/60 transition-all text-xs font-bold shadow-sm"
+              title="Switch to Admin Dashboard"
+            >
+              <ShieldCheck size={14} />
+              <span className="hidden sm:inline">Admin Dashboard</span>
+            </button>
+          )}
+
           <div className="flex items-center gap-3 bg-slate-100/80 border border-slate-200/80 pl-3 pr-4 py-1.5 rounded-2xl">
             <div className="w-7 h-7 rounded-xl bg-purple-600 text-white flex items-center justify-center font-black text-xs shadow-sm shadow-purple-200">
               {user.fullName ? user.fullName.charAt(0).toUpperCase() : (user.username ? user.username.charAt(0).toUpperCase() : 'C')}
