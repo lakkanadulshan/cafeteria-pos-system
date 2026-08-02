@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import logoImg from '../assets/logo.png';
-import toast from 'react-hot-toast'; // Toast එකතු කළා
+import toast from 'react-hot-toast';
 
 import { 
   Coffee, 
@@ -16,14 +16,13 @@ import {
   Banknote,
   CheckCircle2,
   Loader2,
-  AlertCircle,
   ShieldCheck,
-  ChevronRight
+  Package
 } from 'lucide-react';
 
 const BACKEND_ORIGIN = api.defaults.baseURL 
   ? new URL(api.defaults.baseURL).origin 
-  : '{$API}';
+  : 'http://localhost:3000';
 
 const PosMain = () => {
   const navigate = useNavigate();
@@ -33,7 +32,6 @@ const PosMain = () => {
   const [categories, setCategories] = useState([]);
   const [foods, setFoods] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   // Interaction States
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -48,7 +46,6 @@ const PosMain = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    setError(null);
     try {
       const [catRes, menuRes] = await Promise.all([
         api.get('/categories'),
@@ -57,7 +54,6 @@ const PosMain = () => {
       setCategories(catRes.data || []);
       setFoods(menuRes.data || []);
     } catch (err) {
-      setError('Failed to fetch menu items from server.');
       toast.error("Network synchronization failed");
     } finally {
       setLoading(false);
@@ -78,10 +74,29 @@ const PosMain = () => {
     navigate('/login');
   };
 
+  // 🔴 FIXED: ADD TO CART WITH STOCK & AVAILABILITY CHECK
   const addToCart = (item) => {
+    // 1. Availability & Stock Check
+    if (!item.isAvailable) {
+      toast.error(`${item.name} is currently unavailable!`);
+      return;
+    }
+    if (item.stock <= 0) {
+      toast.error(`${item.name} is out of stock!`);
+      return;
+    }
+
+    const existingItem = cart.find((cartItem) => cartItem.id === item.id);
+    const currentQtyInCart = existingItem ? existingItem.quantity : 0;
+
+    // 2. Prevent Exceeding Stock Limit
+    if (currentQtyInCart + 1 > item.stock) {
+      toast.error(`Stock limit reached! Only ${item.stock} available.`, { duration: 2000 });
+      return;
+    }
+
     setCart((prevCart) => {
-      const existing = prevCart.find((cartItem) => cartItem.id === item.id);
-      if (existing) {
+      if (existingItem) {
         return prevCart.map((cartItem) =>
           cartItem.id === item.id
             ? { ...cartItem, quantity: cartItem.quantity + 1 }
@@ -93,7 +108,18 @@ const PosMain = () => {
     toast.success(`${item.name} added`, { duration: 1000, position: 'bottom-left' });
   };
 
+  // 🔴 FIXED: QUANTITY UPDATE WITH STOCK LIMIT CHECK
   const updateQuantity = (id, delta) => {
+    const targetItem = foods.find((f) => f.id === id);
+    const cartItem = cart.find((c) => c.id === id);
+
+    if (delta > 0 && cartItem && targetItem) {
+      if (cartItem.quantity + 1 > targetItem.stock) {
+        toast.error(`Stock limit reached! Only ${targetItem.stock} available.`, { duration: 1500 });
+        return;
+      }
+    }
+
     setCart((prevCart) =>
       prevCart
         .map((item) => {
@@ -139,6 +165,7 @@ const PosMain = () => {
       await api.post('/orders', orderPayload);
       setCart([]);
       toast.success("Order placed successfully!", { id: loadingToast });
+      fetchData(); // Sync updated stock
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to complete order.', { id: loadingToast });
     } finally {
@@ -205,7 +232,7 @@ const PosMain = () => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-purple-600 transition-colors" size={18} />
               <input
                 type="text"
-                placeholder="Search menu matrix..."
+                placeholder="Search food items..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-purple-500/5 focus:border-purple-600 outline-none transition-all shadow-sm"
@@ -239,37 +266,70 @@ const PosMain = () => {
           {loading ? (
             <div className="flex-1 flex flex-col items-center justify-center py-20">
               <Loader2 size={40} className="animate-spin text-purple-600 mb-4" />
-              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">Syncing Matrix...</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">Syncing Menu...</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 overflow-y-auto pr-2 pb-10">
-              {filteredFoods.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => addToCart(item)}
-                  className="group bg-white border border-slate-100 rounded-[2rem] p-4 shadow-sm hover:shadow-xl hover:shadow-purple-500/5 transition-all duration-300 cursor-pointer flex flex-col"
-                >
-                  <div className="h-40 w-full rounded-2xl overflow-hidden mb-4 bg-slate-50 relative">
-                    {getFullImageUrl(item.imageUrl) ? (
-                      <img src={getFullImageUrl(item.imageUrl)} alt={item.name} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                    ) : (
-                      <div className="h-full w-full flex items-center justify-center text-slate-200"><Coffee size={40} /></div>
-                    )}
-                    <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white text-[9px] font-bold text-purple-600 uppercase tracking-widest">
-                      {item.category?.name || 'Item'}
+              {filteredFoods.map((item) => {
+                const isItemDisabled = !item.isAvailable || item.stock <= 0;
+
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => addToCart(item)}
+                    className={`group bg-white border rounded-[2rem] p-4 shadow-sm transition-all duration-300 flex flex-col relative ${
+                      isItemDisabled 
+                        ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-100' 
+                        : 'hover:shadow-xl hover:shadow-purple-500/5 cursor-pointer border-slate-100 hover:border-purple-200'
+                    }`}
+                  >
+                    <div className="h-40 w-full rounded-2xl overflow-hidden mb-4 bg-slate-50 relative">
+                      {getFullImageUrl(item.imageUrl) ? (
+                        <img 
+                          src={getFullImageUrl(item.imageUrl)} 
+                          alt={item.name} 
+                          className={`h-full w-full object-cover transition-transform duration-700 ${!isItemDisabled && 'group-hover:scale-110'}`} 
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-slate-200"><Coffee size={40} /></div>
+                      )}
+                      
+                      {/* Category Badge */}
+                      <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white text-[9px] font-bold text-purple-600 uppercase tracking-widest shadow-sm">
+                        {item.category?.name || 'Item'}
+                      </div>
+
+                      {/* 🔴 UNAVAILABLE / OUT OF STOCK BADGE */}
+                      {isItemDisabled && (
+                        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center">
+                          <span className="bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl shadow-lg">
+                            {!item.isAvailable ? 'Unavailable' : 'Out of Stock'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <h3 className="font-bold text-slate-900 text-sm px-1 line-clamp-1">{item.name}</h3>
+                    
+                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-50">
+                      <div>
+                        <p className="font-black text-slate-900 text-base">Rs. {Number(item.price).toFixed(2)}</p>
+                        <p className={`text-[10px] font-bold flex items-center gap-1 ${item.stock <= 5 ? 'text-rose-500' : 'text-slate-400'}`}>
+                          <Package size={12} /> Stock: {item.stock}
+                        </p>
+                      </div>
+
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+                        isItemDisabled 
+                          ? 'bg-slate-200 text-slate-400' 
+                          : 'bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white'
+                      }`}>
+                        <Plus size={18} />
+                      </div>
                     </div>
                   </div>
-                  
-                  <h3 className="font-bold text-slate-900 text-sm px-1 line-clamp-1">{item.name}</h3>
-                  
-                  <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-50">
-                    <p className="font-black text-slate-900 text-base">Rs. {Number(item.price).toFixed(2)}</p>
-                    <div className="w-9 h-9 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-all">
-                      <Plus size={18} />
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -307,7 +367,7 @@ const PosMain = () => {
                     <button onClick={() => updateQuantity(item.id, 1)} className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-purple-600 transition-colors"><Plus size={14} /></button>
                   </div>
 
-                  <button onClick={() => removeFromCart(item.id)} className="text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
+                  <button onClick={() => removeFromCart(item.id)} className="text-slate-300 hover:text-rose-500 transition-colors" title="Remove Item"><Trash2 size={16} /></button>
                 </div>
               ))
             )}
@@ -330,7 +390,7 @@ const PosMain = () => {
                 <span>Rs. {subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                <span>Network Tax (8%)</span>
+                <span>Tax (8%)</span>
                 <span>Rs. {tax.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center pt-4 border-t border-slate-200">
