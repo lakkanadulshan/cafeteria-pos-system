@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import logoImg from '../../assets/logo.png';
+import toast from 'react-hot-toast'; // Toast එකතු කළා
 
 // Admin Modules
 import CategoryManager from '../admin/CategoryManager';
@@ -22,25 +23,19 @@ import {
   Clock,
   Send,
   Loader2,
-  CheckCircle2,
-  AlertCircle,
   RefreshCw,
-  MonitorPlay
+  MonitorPlay,
+  ChevronRight
 } from 'lucide-react';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
-  // Active Tab State ('menu', 'categories', 'orders', 'reports', 'users', 'approvals')
   const [activeTab, setActiveTab] = useState('menu');
-
-  // Pending Approvals State
   const [pendingUsers, setPendingUsers] = useState([]);
   const [loadingPending, setLoadingPending] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
-  const [message, setMessage] = useState(null);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchPendingUsers();
@@ -48,12 +43,11 @@ const AdminDashboard = () => {
 
   const fetchPendingUsers = async () => {
     setLoadingPending(true);
-    setError(null);
     try {
       const response = await api.get('/auth/pending-users');
       setPendingUsers(response.data);
     } catch (err) {
-      setError('Failed to load pending requests.');
+      toast.error('Failed to load pending requests.');
     } finally {
       setLoadingPending(false);
     }
@@ -61,15 +55,14 @@ const AdminDashboard = () => {
 
   const handleSendLink = async (userId, userEmail) => {
     setActionLoading((prev) => ({ ...prev, [userId]: true }));
-    setMessage(null);
-    setError(null);
+    const loadingToast = toast.loading(`Sending link to ${userEmail}...`);
 
     try {
       await api.post(`/auth/send-verification/${userId}`);
-      setMessage(`Verification link sent successfully to ${userEmail}!`);
+      toast.success("Verification link sent!", { id: loadingToast });
       fetchPendingUsers();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to send verification link.');
+      toast.error(err.response?.data?.message || 'Failed to send link.', { id: loadingToast });
     } finally {
       setActionLoading((prev) => ({ ...prev, [userId]: false }));
     }
@@ -78,255 +71,199 @@ const AdminDashboard = () => {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    toast.success("Signed out successfully");
     navigate('/login');
   };
 
+  const menuItems = [
+    { id: 'menu', label: 'Menu Items', icon: <Utensils size={16} /> },
+    { id: 'categories', label: 'Categories', icon: <Tag size={16} /> },
+    { id: 'orders', label: 'Orders History', icon: <ShoppingBag size={16} /> },
+    { id: 'reports', label: 'Sales Reports', icon: <BarChart2 size={16} /> },
+    { id: 'users', label: 'Staff Directory', icon: <Users size={16} /> },
+    { id: 'approvals', label: 'Pending Approvals', icon: <UserCheck size={16} />, badge: true },
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-purple-100 selection:text-purple-900 flex flex-col">
+    <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-purple-100 selection:text-purple-900 flex flex-col">
       
-      {/* ------------------------------------------------------------- */}
-      {/* TOP NAVIGATION BAR */}
-      {/* ------------------------------------------------------------- */}
-      <nav className="bg-white border-b border-slate-200 sticky top-0 z-30 px-6 py-4 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="p-1.5 bg-purple-50 rounded-2xl border border-purple-100 shadow-sm">
-            <img src={logoImg} alt="Bloom Café" className="w-8 h-8 object-contain rounded-lg" />
+      {/* --- 🟢 MODERN NAVIGATION --- */}
+      <nav className="bg-white/80 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-50 px-8 h-20 flex items-center justify-between">
+        <div className="flex items-center gap-4 group">
+          <div className="p-1.5 bg-white rounded-2xl border border-slate-100 shadow-sm group-hover:border-purple-300 transition-all">
+            <img src={logoImg} alt="Logo" className="w-8 h-8 object-contain" />
           </div>
           <div>
-            <h1 className="text-base font-black tracking-tight text-slate-900">
-              Bloom Café <span className="text-purple-600">Admin Portal</span>
+            <h1 className="text-xl font-bold tracking-tighter text-slate-900 uppercase leading-none">
+              bloom café<span className="text-purple-600">.</span>
             </h1>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              Management & Operations
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">
+              Admin Control Panel
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Open POS Terminal Navigation Button */}
+        <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/pos')}
-            className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 px-3.5 py-2 rounded-xl transition-all text-xs font-bold shadow-sm"
-            title="Switch to Cashier POS View"
+            className="hidden md:flex items-center gap-2 bg-slate-50 hover:bg-slate-900 hover:text-white text-slate-600 px-5 py-2.5 rounded-2xl border border-slate-200 transition-all text-[11px] font-bold uppercase tracking-widest active:scale-95"
           >
-            <MonitorPlay size={14} />
-            <span className="hidden sm:inline">Open POS Terminal</span>
+            <MonitorPlay size={16} />
+            POS Terminal
           </button>
 
-          <div className="hidden sm:flex items-center gap-2 bg-slate-100 px-3.5 py-1.5 rounded-xl border border-slate-200/80">
-            <Shield size={14} className="text-purple-600" />
-            <span className="text-xs font-bold text-slate-700">{currentUser.fullName || 'Admin'}</span>
+          <div className="hidden sm:flex items-center gap-3 pl-4 border-l border-slate-100">
+            <div className="text-right">
+              <p className="text-xs font-bold text-slate-900">{currentUser.fullName || 'Administrator'}</p>
+              <p className="text-[9px] font-bold text-purple-500 uppercase tracking-widest leading-none">System Root</p>
+            </div>
+            <div className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-bold shadow-lg">
+              {currentUser.fullName ? currentUser.fullName.charAt(0) : 'A'}
+            </div>
           </div>
 
-          <button
-            onClick={handleLogout}
-            className="text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-100 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5"
-          >
-            <LogOut size={14} />
-            <span className="hidden sm:inline">Logout</span>
+          <button onClick={handleLogout} className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
+            <LogOut size={20} />
           </button>
         </div>
       </nav>
 
-      {/* ------------------------------------------------------------- */}
-      {/* MAIN CONTAINER */}
-      {/* ------------------------------------------------------------- */}
-      <main className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
+      {/* --- 🟢 MAIN DASHBOARD CONTENT --- */}
+      <main className="max-w-7xl mx-auto w-full px-8 py-10 flex-1 flex flex-col">
         
         {/* Navigation Tabs Bar */}
-        <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm mb-8">
-          
-          <button
-            onClick={() => setActiveTab('menu')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              activeTab === 'menu' ? 'bg-purple-600 text-white shadow-md shadow-purple-200' : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <Utensils size={16} />
-            <span>Menu Items</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('categories')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              activeTab === 'categories' ? 'bg-purple-600 text-white shadow-md shadow-purple-200' : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <Tag size={16} />
-            <span>Categories</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              activeTab === 'orders' ? 'bg-purple-600 text-white shadow-md shadow-purple-200' : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <ShoppingBag size={16} />
-            <span>Orders History</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('reports')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              activeTab === 'reports' ? 'bg-purple-600 text-white shadow-md shadow-purple-200' : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <BarChart2 size={16} />
-            <span>Sales Reports</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              activeTab === 'users' ? 'bg-purple-600 text-white shadow-md shadow-purple-200' : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <Users size={16} />
-            <span>Staff Management</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('approvals')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              activeTab === 'approvals' ? 'bg-purple-600 text-white shadow-md shadow-purple-200' : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <UserCheck size={16} />
-            <span>Pending Approvals</span>
-            {pendingUsers.length > 0 && (
-              <span className="bg-amber-400 text-slate-900 font-black text-[10px] px-2 py-0.5 rounded-full ml-1">
-                {pendingUsers.length}
-              </span>
-            )}
-          </button>
-
+        <div className="flex flex-wrap gap-2 bg-slate-50/50 p-2 rounded-3xl border border-slate-100 mb-10 overflow-x-auto scrollbar-none">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl text-[11px] font-bold uppercase tracking-widest transition-all duration-300 shrink-0 ${
+                activeTab === item.id 
+                ? 'bg-slate-900 text-white shadow-xl shadow-slate-200' 
+                : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+              }`}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+              {item.badge && pendingUsers.length > 0 && (
+                <span className="bg-purple-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[9px] font-black border-2 border-slate-900">
+                  {pendingUsers.length}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
-        {/* ------------------------------------------------------------- */}
-        {/* DYNAMIC TAB CONTENT RENDER */}
-        {/* ------------------------------------------------------------- */}
-        {activeTab === 'menu' && <MenuManager />}
-        {activeTab === 'categories' && <CategoryManager />}
-        {activeTab === 'orders' && <OrderManager />}
-        {activeTab === 'reports' && <ReportManager />}
-        {activeTab === 'users' && <UserManager />}
+        {/* --- 🟢 DYNAMIC CONTENT --- */}
+        <div className="flex-1 animate-in fade-in duration-500">
+          {activeTab === 'menu' && <MenuManager />}
+          {activeTab === 'categories' && <CategoryManager />}
+          {activeTab === 'orders' && <OrderManager />}
+          {activeTab === 'reports' && <ReportManager />}
+          {activeTab === 'users' && <UserManager />}
 
-        {/* Pending Approvals Tab View */}
-        {activeTab === 'approvals' && (
-          <div className="space-y-6">
-            
-            {/* Header Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-              <div>
-                <h2 className="text-xl font-black tracking-tight text-slate-900 flex items-center gap-2.5">
-                  <UserCheck className="text-purple-600" size={24} />
-                  <span>Pending Staff Approvals</span>
-                </h2>
-                <p className="text-xs font-semibold text-slate-400 mt-1">
-                  Review newly registered cashiers and trigger verification magic links.
-                </p>
-              </div>
-
-              <button
-                onClick={fetchPendingUsers}
-                disabled={loadingPending}
-                className="bg-slate-50 border border-slate-200 hover:border-purple-300 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-2xl transition-all flex items-center gap-2 self-start sm:self-auto"
-              >
-                <RefreshCw size={14} className={loadingPending ? "animate-spin text-purple-600" : ""} />
-                <span>Refresh List</span>
-              </button>
-            </div>
-
-            {/* Alerts */}
-            {message && (
-              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl text-xs flex items-center gap-3">
-                <CheckCircle2 size={18} className="shrink-0 text-emerald-600" />
-                <span className="font-bold">{message}</span>
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-2xl text-xs flex items-center gap-3">
-                <AlertCircle size={18} className="shrink-0 text-rose-600" />
-                <span className="font-semibold">{error}</span>
-              </div>
-            )}
-
-            {/* Pending Approvals Table */}
-            <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
-              {loadingPending ? (
-                <div className="p-12 text-center text-slate-400 flex flex-col items-center justify-center">
-                  <Loader2 size={32} className="animate-spin text-purple-600 mb-3" />
-                  <p className="text-xs font-bold uppercase tracking-wider">Loading Requests...</p>
+          {/* Pending Approvals View */}
+          {activeTab === 'approvals' && (
+            <div className="space-y-8">
+              
+              {/* Approvals Header */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-4">
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase flex items-center gap-3">
+                    Approvals Matrix
+                  </h2>
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Reviewing new staff requests</p>
                 </div>
-              ) : pendingUsers.length === 0 ? (
-                <div className="p-12 text-center text-slate-400">
-                  <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-400">
-                    <Clock size={24} />
+
+                <button
+                  onClick={fetchPendingUsers}
+                  disabled={loadingPending}
+                  className="bg-white border border-slate-200 hover:border-purple-300 text-slate-500 p-3 rounded-2xl transition-all active:scale-95 shadow-sm"
+                >
+                  <RefreshCw size={18} className={loadingPending ? "animate-spin text-purple-600" : ""} />
+                </button>
+              </div>
+
+              {/* Data Table */}
+              <div className="bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl shadow-slate-200/40 overflow-hidden">
+                {loadingPending ? (
+                  <div className="py-24 text-center">
+                    <Loader2 size={40} className="animate-spin text-purple-600 mx-auto mb-4" />
+                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">Syncing Requests...</p>
                   </div>
-                  <p className="text-sm font-bold text-slate-700">No Pending Approvals</p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    All staff accounts are currently verified or no new registration requests found.
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        <th className="p-4 pl-6">Full Name</th>
-                        <th className="p-4">Email Address</th>
-                        <th className="p-4">Requested On</th>
-                        <th className="p-4">Status</th>
-                        <th className="p-4 pr-6 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
-                      {pendingUsers.map((user) => (
-                        <tr key={user.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="p-4 pl-6 font-bold text-slate-900">{user.fullName || "N/A"}</td>
-                          <td className="p-4 text-slate-600">{user.email}</td>
-                          <td className="p-4 text-slate-400">
-                            {new Date(user.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="p-4">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200/60">
-                              <Clock size={12} />
-                              <span>Pending Link</span>
-                            </span>
-                          </td>
-                          <td className="p-4 pr-6 text-right">
-                            <button
-                              onClick={() => handleSendLink(user.id, user.email)}
-                              disabled={actionLoading[user.id]}
-                              className="bg-purple-600 hover:bg-slate-900 disabled:bg-slate-200 text-white font-bold px-4 py-2 rounded-xl transition-all shadow-md shadow-purple-100 inline-flex items-center gap-2 text-xs"
-                            >
-                              {actionLoading[user.id] ? (
-                                <>
-                                  <Loader2 size={14} className="animate-spin" />
-                                  <span>Sending...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Send size={14} />
-                                  <span>Approve & Send Link</span>
-                                </>
-                              )}
-                            </button>
-                          </td>
+                ) : pendingUsers.length === 0 ? (
+                  <div className="py-24 text-center">
+                    <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 text-slate-200">
+                      <Clock size={32} />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-900">Directory Clear</h3>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-2">No pending approval nodes found.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-slate-50/50 border-b border-slate-100 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                          <th className="px-10 py-6">Staff Member</th>
+                          <th className="px-10 py-6">Network Node</th>
+                          <th className="px-10 py-6">Request Date</th>
+                          <th className="px-10 py-6">Status</th>
+                          <th className="px-10 py-6 text-right">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {pendingUsers.map((user) => (
+                          <tr key={user.id} className="hover:bg-slate-50/50 transition-all group">
+                            <td className="px-10 py-6">
+                               <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 font-bold border border-purple-100 shadow-sm">
+                                     {user.fullName ? user.fullName.charAt(0) : 'U'}
+                                  </div>
+                                  <span className="font-bold text-slate-900 text-sm">{user.fullName || "Unnamed User"}</span>
+                               </div>
+                            </td>
+                            <td className="px-10 py-6 text-slate-500 text-sm font-bold">{user.email}</td>
+                            <td className="px-10 py-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                              {new Date(user.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-10 py-6">
+                              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest bg-amber-50 text-amber-600 border border-amber-100">
+                                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
+                                Pending Link
+                              </span>
+                            </td>
+                            <td className="px-10 py-6 text-right">
+                              <button
+                                onClick={() => handleSendLink(user.id, user.email)}
+                                disabled={actionLoading[user.id]}
+                                className="bg-slate-900 hover:bg-purple-600 disabled:opacity-30 text-white font-black px-6 py-3 rounded-2xl transition-all shadow-xl shadow-slate-200 hover:shadow-purple-200 inline-flex items-center gap-2 text-[10px] uppercase tracking-widest active:scale-95"
+                              >
+                                {actionLoading[user.id] ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                  <>
+                                    <Send size={14} />
+                                    <span>Approve & Sync</span>
+                                  </>
+                                )}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
-
-          </div>
-        )}
-
+          )}
+        </div>
       </main>
+
+      {/* --- 🟢 FOOTER BRAND LABEL --- */}
+      <footer className="py-8 px-8 border-t border-slate-50 flex justify-center">
+         <span className="text-[9px] font-bold text-slate-300 uppercase tracking-[0.4em]">Bloom Café Matrix Management Module</span>
+      </footer>
 
     </div>
   );

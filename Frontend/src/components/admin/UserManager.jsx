@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
+import toast from 'react-hot-toast'; 
+import Swal from 'sweetalert2'; 
 import { 
   Users, 
   Shield, 
@@ -9,8 +11,10 @@ import {
   Search, 
   Lock,
   Mail,
-  CheckCircle,
-  AlertCircle
+  CheckCircle2,
+  AlertCircle,
+  Filter,
+  ChevronRight
 } from 'lucide-react';
 
 const UserManager = () => {
@@ -30,7 +34,7 @@ const UserManager = () => {
       const response = await api.get('/users');
       setUsers(response.data);
     } catch (err) {
-      console.error("Failed to load users:", err);
+      toast.error("Failed to load user directory");
     } finally {
       setLoading(false);
     }
@@ -38,36 +42,51 @@ const UserManager = () => {
 
   const handleToggleStatus = async (user) => {
     if (user.id === currentUser.id) {
-      alert("You cannot deactivate your own admin account!");
+      toast.error("You cannot deactivate your own admin node!");
       return;
     }
 
     const action = user.isActive ? "deactivate" : "activate";
-    if (!window.confirm(`Are you sure you want to ${action} ${user.fullName}'s account?`)) return;
+    
+    const result = await Swal.fire({
+      title: `${action.toUpperCase()} Node?`,
+      text: `Are you sure you want to ${action} ${user.fullName}'s access?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: user.isActive ? '#f43f5e' : '#6366f1',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: `Yes, ${action}`,
+      borderRadius: '24px'
+    });
 
-    try {
-      await api.patch(`/users/${user.id}/status`, { isActive: !user.isActive });
-      fetchUsers(); // Refresh list
-    } catch (err) {
-      alert(err.response?.data?.message || "Failed to update user status");
+    if (result.isConfirmed) {
+      const loadingToast = toast.loading("Updating status...");
+      try {
+        await api.patch(`/users/${user.id}/status`, { isActive: !user.isActive });
+        toast.success(`Account ${user.isActive ? 'deactivated' : 'activated'}`, { id: loadingToast });
+        fetchUsers();
+      } catch (err) {
+        toast.error("Status update failed", { id: loadingToast });
+      }
     }
   };
 
   const handleChangeRole = async (user, newRole) => {
     if (user.id === currentUser.id) {
-      alert("You cannot change your own role!");
+      toast.error("Self-role modification is blocked");
       return;
     }
 
+    const loadingToast = toast.loading("Syncing permissions...");
     try {
       await api.put(`/users/${user.id}/role`, { role: newRole });
+      toast.success("Access level updated", { id: loadingToast });
       fetchUsers();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to update user role");
+      toast.error("Failed to update role", { id: loadingToast });
     }
   };
 
-  // Filtered Users List
   const filteredUsers = users.filter(u => {
     const matchesRole = roleFilter === 'ALL' || u.role === roleFilter;
     const matchesSearch = u.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -76,102 +95,104 @@ const UserManager = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-10">
       
-      {/* Search & Filter Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          
-          {/* Search Bar */}
-          <div className="relative flex-1 sm:w-72">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      {/* --- 🟢 SEARCH & FILTER MODULE --- */}
+      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6">
+        <div className="flex flex-col md:flex-row items-center gap-4 w-full lg:w-auto">
+          <div className="relative w-full md:w-80 group">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-purple-600 transition-colors" />
             <input
               type="text"
-              placeholder="Search staff by name or email..."
+              placeholder="Search staff directory..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600"
+              className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-slate-800 focus:bg-white focus:ring-4 focus:ring-purple-500/5 focus:border-purple-600 outline-none transition-all shadow-sm"
             />
           </div>
 
-          {/* Role Filter */}
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600"
-          >
-            <option value="ALL">All Roles</option>
-            <option value="ADMIN">Admins Only</option>
-            <option value="CASHIER">Cashiers Only</option>
-          </select>
-
+          <div className="relative w-full md:w-64 group">
+            <Filter size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-slate-600 focus:bg-white focus:border-purple-600 outline-none appearance-none cursor-pointer"
+            >
+              <option value="ALL">All Roles</option>
+              <option value="ADMIN">Admins Only</option>
+              <option value="CASHIER">Cashiers Only</option>
+            </select>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 text-slate-500 text-xs font-bold">
-          <Users size={16} className="text-purple-600" />
-          <span>Total Registered Staff: {users.length}</span>
+        <div className="flex items-center gap-3 px-6 py-3 bg-purple-50 rounded-2xl border border-purple-100 shadow-sm">
+          <Users size={18} className="text-purple-600" />
+          <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">
+            Total Staff Nodes: {users.length}
+          </span>
         </div>
       </div>
 
-      {/* Users Table */}
-      <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+      {/* --- 🟢 STAFF TABLE --- */}
+      <div className="bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl shadow-slate-200/40 overflow-hidden">
         {loading ? (
-          <div className="py-12 text-center text-slate-400">
-            <Loader2 size={24} className="animate-spin mx-auto mb-2 text-purple-600" />
-            <p className="text-xs font-bold">Loading User Accounts...</p>
+          <div className="py-32 text-center">
+            <Loader2 size={40} className="animate-spin text-purple-600 mx-auto mb-4" />
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400 font-black">Accessing Directory...</p>
           </div>
         ) : filteredUsers.length === 0 ? (
-          <div className="py-12 text-center text-slate-400 text-xs font-semibold">
-            No matching user accounts found.
+          <div className="py-24 text-center">
+            <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-slate-100">
+               <Users size={32} className="text-slate-200" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 uppercase tracking-tight">Node Not Found</h3>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-2">No matching staff members in this sector.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                  <th className="p-4 pl-6">Staff Member</th>
-                  <th className="p-4">Email Address</th>
-                  <th className="p-4">Role</th>
-                  <th className="p-4">Account Status</th>
-                  <th className="p-4 pr-6 text-right">Actions</th>
+                <tr className="bg-slate-50/50 border-b border-slate-100 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                  <th className="px-10 py-6">Identity Node</th>
+                  <th className="px-10 py-6">Network Email</th>
+                  <th className="px-10 py-6 text-center">Access Level</th>
+                  <th className="px-10 py-6 text-center">Status</th>
+                  <th className="px-10 py-6 text-right">Matrix Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
+              <tbody className="divide-y divide-slate-50">
                 {filteredUsers.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                  <tr key={u.id} className="hover:bg-slate-50/80 transition-all group">
                     
-                    {/* User Info */}
-                    <td className="p-4 pl-6 font-bold text-slate-800">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-2xl bg-purple-50 text-purple-600 font-black flex items-center justify-center border border-purple-100">
+                    <td className="px-10 py-7">
+                      <div className="flex items-center gap-4">
+                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-50 to-white flex items-center justify-center text-purple-600 font-black text-base border border-purple-100 shadow-sm group-hover:scale-110 transition-transform">
                           {u.fullName.charAt(0).toUpperCase()}
                         </div>
-                        <div>
-                          <p className="font-extrabold text-slate-900">{u.fullName}</p>
-                          <p className="text-[10px] font-normal text-slate-400">ID: #{u.id}</p>
+                        <div className="flex flex-col">
+                          <span className="font-black text-slate-900 text-[15px] uppercase tracking-tight">{u.fullName}</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">ID Node: #{u.id}</span>
                         </div>
                       </div>
                     </td>
 
-                    {/* Email */}
-                    <td className="p-4 text-slate-600 font-medium">
-                      <div className="flex items-center gap-1.5">
-                        <Mail size={14} className="text-slate-400" />
+                    <td className="px-10 py-7">
+                      <div className="flex items-center gap-2 text-sm font-bold text-slate-500">
+                        <Mail size={14} className="text-slate-300" />
                         <span>{u.email}</span>
                       </div>
                     </td>
 
-                    {/* Role Selector */}
-                    <td className="p-4">
+                    <td className="px-10 py-7 text-center">
                       {u.id === currentUser.id ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full font-black">
-                          <Shield size={12} /> ADMIN (YOU)
+                        <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-900 text-white border border-slate-900 shadow-lg shadow-slate-200">
+                          <Shield size={12} className="text-purple-400" /> MASTER ROOT
                         </span>
                       ) : (
                         <select
                           value={u.role}
                           onChange={(e) => handleChangeRole(u, e.target.value)}
-                          className="bg-slate-100 border border-slate-200 text-slate-800 font-extrabold text-[11px] rounded-xl px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-purple-600/20"
+                          className="bg-slate-50 border border-slate-200 text-slate-800 font-black text-[10px] uppercase tracking-widest rounded-xl px-4 py-2 focus:ring-4 focus:ring-purple-500/5 focus:border-purple-600 outline-none cursor-pointer"
                         >
                           <option value="CASHIER">CASHIER</option>
                           <option value="ADMIN">ADMIN</option>
@@ -179,32 +200,32 @@ const UserManager = () => {
                       )}
                     </td>
 
-                    {/* Status Badge */}
-                    <td className="p-4">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black ${
+                    <td className="px-10 py-7 text-center">
+                      <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-[0.2em] border ${
                         u.isActive 
-                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
-                          : 'bg-rose-50 text-rose-600 border border-rose-100'
+                          ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                          : 'bg-rose-50 text-rose-600 border-rose-100'
                       }`}>
-                        {u.isActive ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
-                        <span>{u.isActive ? 'ACTIVE' : 'BLOCKED'}</span>
+                        <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                        {u.isActive ? 'ACTIVE' : 'BLOCKED'}
                       </span>
                     </td>
 
-                    {/* Status Toggle Action */}
-                    <td className="p-4 pr-6 text-right">
-                      {u.id !== currentUser.id && (
+                    <td className="px-10 py-7 text-right">
+                      {u.id !== currentUser.id ? (
                         <button
                           onClick={() => handleToggleStatus(u)}
-                          className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ml-auto ${
+                          className={`group/btn px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 shadow-xl flex items-center gap-2 ml-auto ${
                             u.isActive
-                              ? 'bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white'
-                              : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white'
+                              ? 'bg-white border border-rose-100 text-rose-500 hover:bg-rose-500 hover:text-white hover:shadow-rose-100'
+                              : 'bg-white border border-emerald-100 text-emerald-500 hover:bg-emerald-600 hover:text-white hover:shadow-emerald-100'
                           }`}
                         >
                           {u.isActive ? <UserX size={14} /> : <UserCheck size={14} />}
                           <span>{u.isActive ? 'Deactivate' : 'Activate'}</span>
                         </button>
+                      ) : (
+                        <span className="text-[9px] font-black text-slate-200 uppercase tracking-widest">Self Locked</span>
                       )}
                     </td>
 
@@ -214,6 +235,11 @@ const UserManager = () => {
             </table>
           </div>
         )}
+      </div>
+
+      {/* --- 🟢 FOOTER BRAND LABEL --- */}
+      <div className="pt-8 border-t border-slate-50 flex justify-center">
+         <span className="text-[9px] font-bold text-slate-300 uppercase tracking-[0.4em]">Bloom Café Staff Hierarchy Matrix</span>
       </div>
 
     </div>

@@ -1,10 +1,12 @@
 import axios from 'axios';
 
-const API = axios.create({
-  baseURL: 'http://localhost:3000/api', 
+const BASE_URL = 'http://localhost:3000/api';
+
+const api = axios.create({
+  baseURL: BASE_URL, 
 });
 
-API.interceptors.request.use((req) => {
+api.interceptors.request.use((req) => {
   const token = localStorage.getItem('token');
   if (token) {
     req.headers.Authorization = `Bearer ${token}`;
@@ -12,4 +14,6 @@ API.interceptors.request.use((req) => {
   return req;
 });
 
-export default API;
+export const BACKEND_ORIGIN = new URL(api.defaults.baseURL).origin;
+
+export default api;

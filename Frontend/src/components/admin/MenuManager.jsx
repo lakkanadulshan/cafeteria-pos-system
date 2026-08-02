@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import api from '../../api/axios';
+import api, { BACKEND_ORIGIN } from '../../api/axios';
+import toast from 'react-hot-toast';
+import Swal from 'sweetalert2';
 import { 
   Utensils, 
   Plus, 
@@ -7,17 +9,13 @@ import {
   Loader2, 
   Upload, 
   X, 
-  CheckCircle, 
+  CheckCircle2, 
   XCircle,
   Search,
   Package,
-  Edit3
+  Edit3,
+  Filter
 } from 'lucide-react';
-
-// Extract dynamic backend origin from Axios base URL
-const BACKEND_ORIGIN = api.defaults.baseURL 
-  ? new URL(api.defaults.baseURL).origin 
-  : 'http://localhost:3000';
 
 const MenuManager = () => {
   const [menuItems, setMenuItems] = useState([]);
@@ -28,7 +26,6 @@ const MenuManager = () => {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Form State
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -39,7 +36,6 @@ const MenuManager = () => {
   });
   const [imagePreview, setImagePreview] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -55,7 +51,7 @@ const MenuManager = () => {
       setMenuItems(menuRes.data || []);
       setCategories(catRes.data || []);
     } catch (err) {
-      setError("Failed to load menu data");
+      toast.error("Failed to fetch menu items");
     } finally {
       setLoading(false);
     }
@@ -66,10 +62,10 @@ const MenuManager = () => {
     if (file) {
       setFormData({ ...formData, imageFile: file });
       setImagePreview(URL.createObjectURL(file));
+      toast.success("Image selected");
     }
   };
 
-  // Helper for safe URL formatting
   const getFullImageUrl = (path) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
@@ -77,9 +73,7 @@ const MenuManager = () => {
     return `${BACKEND_ORIGIN}${cleanPath}`;
   };
 
-  // Open Modal for Create or Edit
   const handleOpenModal = (item = null) => {
-    setError(null);
     if (item) {
       setEditingItem(item);
       setFormData({
@@ -90,7 +84,6 @@ const MenuManager = () => {
         categoryId: item.categoryId,
         imageFile: null
       });
-
       setImagePreview(getFullImageUrl(item.imageUrl));
     } else {
       resetForm();
@@ -101,12 +94,12 @@ const MenuManager = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.categoryId) {
-      alert("Please select a category");
+      toast.error("Please select a valid category");
       return;
     }
 
     setSubmitting(true);
-    setError(null);
+    const loadingToast = toast.loading(editingItem ? "Updating item..." : "Adding new item...");
 
     const postData = new FormData();
     postData.append('name', formData.name);
@@ -123,38 +116,56 @@ const MenuManager = () => {
         await api.put(`/menu/${editingItem.id}`, postData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
+        toast.success("Item updated successfully", { id: loadingToast });
       } else {
         await api.post('/menu', postData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
+        toast.success("New food item added", { id: loadingToast });
       }
       
       setIsModalOpen(false);
       resetForm();
       fetchData();
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to save menu item");
+      toast.error(err.response?.data?.message || "Operation failed", { id: loadingToast });
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleToggleAvailability = async (item) => {
+    const loadingToast = toast.loading("Updating status...");
     try {
       await api.put(`/menu/${item.id}`, { isAvailable: !item.isAvailable });
+      toast.success(`${item.name} is now ${!item.isAvailable ? 'Available' : 'Unavailable'}`, { id: loadingToast });
       fetchData();
     } catch (err) {
-      alert("Failed to update status");
+      toast.error("Failed to update status", { id: loadingToast });
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this menu item?")) return;
-    try {
-      await api.delete(`/menu/${id}`);
-      fetchData();
-    } catch (err) {
-      alert("Failed to delete item");
+    const result = await Swal.fire({
+      title: 'Delete Food Item?',
+      text: "Are you sure you want to remove this item from the menu?",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#f43f5e',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Yes, Delete',
+      borderRadius: '24px'
+    });
+
+    if (result.isConfirmed) {
+      const loadingToast = toast.loading("Deleting item...");
+      try {
+        await api.delete(`/menu/${id}`);
+        toast.success("Item deleted successfully", { id: loadingToast });
+        fetchData();
+      } catch (err) {
+        toast.error("Failed to delete item", { id: loadingToast });
+      }
     }
   };
 
@@ -164,7 +175,6 @@ const MenuManager = () => {
     setImagePreview(null);
   };
 
-  // Filter Logic
   const filteredItems = menuItems.filter(item => {
     const matchesCategory = selectedCategoryFilter === 'ALL' || item.categoryId === parseInt(selectedCategoryFilter, 10);
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -172,121 +182,125 @@ const MenuManager = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       
-      {/* Top Action & Search Bar */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      {/* --- 🟢 FILTER & ACTION BAR --- */}
+      <div className="flex flex-col lg:flex-row justify-between items-center gap-6 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+        <div className="flex flex-col md:flex-row items-center gap-4 w-full lg:w-auto">
+          <div className="relative w-full md:w-80 group">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-purple-600 transition-colors" />
             <input
               type="text"
-              placeholder="Search items..."
+              placeholder="Search food items..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600"
+              className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-slate-800 focus:bg-white focus:ring-4 focus:ring-purple-500/5 focus:border-purple-600 outline-none transition-all shadow-sm"
             />
           </div>
 
-          <select
-            value={selectedCategoryFilter}
-            onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-purple-600"
-          >
-            <option value="ALL">All Categories</option>
-            {categories.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <div className="relative w-full md:w-64 group">
+            <Filter size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+            <select
+              value={selectedCategoryFilter}
+              onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-slate-600 focus:bg-white focus:border-purple-600 outline-none appearance-none cursor-pointer"
+            >
+              <option value="ALL">All Categories</option>
+              {categories.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <button
           onClick={() => handleOpenModal()}
-          className="bg-purple-600 hover:bg-slate-900 text-white font-black px-5 py-2.5 rounded-2xl shadow-lg shadow-purple-200 transition-all text-xs uppercase tracking-wider flex items-center gap-2"
+          className="w-full lg:w-auto bg-slate-900 hover:bg-purple-600 text-white font-black px-10 py-4 rounded-2xl shadow-xl shadow-slate-200 hover:shadow-purple-200 transition-all duration-300 text-[11px] uppercase tracking-[0.2em] flex items-center justify-center gap-3 active:scale-95"
         >
-          <Plus size={16} />
-          <span>Add Food Item</span>
+          <Plus size={18} /> Add Food Item
         </button>
       </div>
 
-      {/* Food Items Cards Grid */}
+      {/* --- 🟢 MENU GRID --- */}
       {loading ? (
-        <div className="py-12 text-center text-slate-400">
-          <Loader2 size={24} className="animate-spin mx-auto mb-2 text-purple-600" />
-          <p className="text-xs font-bold">Loading Menu Items...</p>
+        <div className="py-32 text-center">
+          <Loader2 size={40} className="animate-spin text-purple-600 mx-auto mb-4" />
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400 font-black">Loading Menu...</p>
         </div>
       ) : filteredItems.length === 0 ? (
-        <div className="bg-white rounded-3xl p-12 text-center text-slate-400 text-xs font-semibold border border-slate-200">
-          No food items found.
+        <div className="bg-white rounded-[3rem] p-24 text-center border-2 border-dashed border-slate-100">
+           <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 text-slate-200 border border-slate-100">
+            <Utensils size={32} />
+          </div>
+          <p className="text-slate-900 font-black text-lg">No Food Items Found</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Add a new item to populate the menu</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
           {filteredItems.map(item => {
             const itemImageUrl = getFullImageUrl(item.imageUrl);
-
             return (
-              <div key={item.id} className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm flex flex-col justify-between space-y-3">
-                <div className="flex gap-3">
-                  <div className="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden shrink-0 border border-slate-100 relative flex items-center justify-center">
+              <div key={item.id} className="group bg-white border border-slate-100 rounded-[2.5rem] p-6 shadow-sm hover:shadow-2xl hover:shadow-purple-500/5 transition-all duration-500 flex flex-col justify-between">
+                <div className="space-y-5">
+                  <div className="w-full h-52 rounded-[2rem] bg-slate-50 overflow-hidden relative border border-slate-50 shadow-inner">
                     {itemImageUrl ? (
-                      <img 
-                        src={itemImageUrl} 
-                        alt={item.name} 
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                        }}
-                      />
+                      <img src={itemImageUrl} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                     ) : (
-                      <Utensils size={24} className="text-slate-300" />
+                      <div className="h-full w-full flex items-center justify-center text-slate-200"><Utensils size={48} strokeWidth={1} /></div>
                     )}
+                    <div className="absolute top-4 left-4 flex gap-2">
+                       <span className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-xl text-[9px] font-black text-purple-600 uppercase tracking-widest border border-white shadow-sm">
+                        {item.category?.name || 'Category'}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-purple-600 bg-purple-50 px-2 py-0.5 rounded-md">
-                      {item.category?.name || 'Category'}
-                    </span>
-                    <h4 className="font-bold text-slate-800 text-sm truncate mt-1">{item.name}</h4>
-                    <p className="text-[11px] text-slate-400 line-clamp-1">{item.description || 'No description'}</p>
+                  <div className="px-2">
+                    <h4 className="font-black text-slate-900 text-lg uppercase tracking-tight group-hover:text-purple-600 transition-colors leading-none">{item.name}</h4>
+                    <p className="text-slate-400 text-xs font-bold mt-2 line-clamp-2 leading-relaxed">{item.description || 'No description provided.'}</p>
                     
-                    <div className="flex items-center gap-3 mt-1.5">
-                      <p className="font-black text-slate-900 text-xs">Rs. {parseFloat(item.price).toFixed(2)}</p>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 ${item.stock > 10 ? 'bg-slate-100 text-slate-700' : 'bg-amber-50 text-amber-700 font-extrabold'}`}>
-                        <Package size={12} />
-                        <span>{item.stock} in stock</span>
-                      </span>
+                    <div className="flex items-center gap-4 mt-6">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Price</span>
+                        <span className="font-black text-slate-900 text-xl tracking-tighter">Rs. {parseFloat(item.price).toFixed(2)}</span>
+                      </div>
+                      <div className={`flex flex-col border-l border-slate-100 pl-4`}>
+                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Stock</span>
+                        <span className={`text-[11px] font-black flex items-center gap-1.5 ${item.stock > 10 ? 'text-slate-600' : 'text-rose-500'}`}>
+                          <Package size={14} /> {item.stock} Units
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between pt-6 mt-6 border-t border-slate-50">
                   <button
                     onClick={() => handleToggleAvailability(item)}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-[11px] font-bold transition-all ${
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
                       item.isAvailable && item.stock > 0
-                        ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' 
-                        : 'bg-rose-50 text-rose-600 hover:bg-rose-100'
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                        : 'bg-rose-50 text-rose-600 border border-rose-100'
                     }`}
                   >
-                    {item.isAvailable && item.stock > 0 ? <CheckCircle size={14} /> : <XCircle size={14} />}
-                    <span>{item.isAvailable && item.stock > 0 ? 'In Stock' : 'Out of Stock'}</span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${item.isAvailable && item.stock > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                    {item.isAvailable && item.stock > 0 ? 'Available' : 'Unavailable'}
                   </button>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleOpenModal(item)}
-                      className="p-1.5 text-slate-400 hover:text-purple-600 rounded-xl transition-colors"
-                      title="Edit Item & Update Stock"
+                      className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 hover:text-purple-600 hover:bg-purple-50 border border-slate-100 transition-all flex items-center justify-center active:scale-90"
+                      title="Edit Item"
                     >
-                      <Edit3 size={16} />
+                      <Edit3 size={18} />
                     </button>
-
                     <button
                       onClick={() => handleDelete(item.id)}
-                      className="p-1.5 text-slate-300 hover:text-rose-600 rounded-xl transition-colors"
+                      className="w-10 h-10 rounded-xl bg-slate-50 text-slate-300 hover:text-rose-500 hover:bg-rose-50 border border-slate-100 transition-all flex items-center justify-center active:scale-90"
+                      title="Delete Item"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={18} />
                     </button>
                   </div>
                 </div>
@@ -296,100 +310,102 @@ const MenuManager = () => {
         </div>
       )}
 
-      {/* Add / Edit Modal */}
+      {/* --- 🟢 ADD / EDIT MODAL --- */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-slate-800 text-base">
-                {editingItem ? 'Edit Item & Update Stock' : 'Add New Menu Item'}
-              </h3>
-              <button onClick={() => setIsModalOpen(false)}><X size={18} className="text-slate-400" /></button>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-xl animate-in fade-in duration-300" onClick={() => setIsModalOpen(false)}></div>
+          <div className="bg-white border border-slate-100 rounded-[3rem] max-w-xl w-full p-12 shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300 scrollbar-none">
+            
+            <div className="flex justify-between items-center mb-10">
+              <div>
+                <h3 className="font-black text-slate-900 text-3xl italic tracking-tight">
+                  {editingItem ? 'Edit Food Item' : 'Add New Item'}
+                </h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Configure Item Details</p>
+              </div>
+              <button onClick={() => setIsModalOpen(false)} className="w-12 h-12 bg-slate-50 text-slate-400 hover:text-rose-500 rounded-2xl flex items-center justify-center transition-all active:scale-90"><X size={24} /></button>
             </div>
 
-            {error && <div className="p-3 bg-rose-50 text-rose-600 text-xs font-semibold rounded-2xl">{error}</div>}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Item Name</label>
+            <form onSubmit={handleSubmit} className="space-y-8">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Item Name</label>
                 <input
-                  type="text" required
+                  type="text" required placeholder="Item Name..."
                   value={formData.name}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-slate-50 border rounded-2xl px-4 py-2.5 text-xs font-semibold"
+                  className="w-full bg-slate-50 border border-slate-100 rounded-[1.5rem] px-6 py-4 text-sm font-bold text-slate-900 focus:bg-white focus:border-purple-600 outline-none transition-all"
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Category</label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Category</label>
                   <select
                     required
                     value={formData.categoryId}
                     onChange={e => setFormData({ ...formData, categoryId: e.target.value })}
-                    className="w-full bg-slate-50 border rounded-2xl px-3 py-2.5 text-xs font-semibold"
+                    className="w-full bg-slate-50 border border-slate-100 rounded-[1.5rem] px-6 py-4 text-sm font-bold text-slate-900 outline-none cursor-pointer"
                   >
-                    <option value="">Select</option>
+                    <option value="">Select Category</option>
                     {categories.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                 </div>
 
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Price (Rs.)</label>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Price (Rs.)</label>
                   <input
-                    type="number" step="0.01" required
+                    type="number" step="0.01" required placeholder="0.00"
                     value={formData.price}
                     onChange={e => setFormData({ ...formData, price: e.target.value })}
-                    className="w-full bg-slate-50 border rounded-2xl px-4 py-2.5 text-xs font-semibold"
+                    className="w-full bg-slate-50 border border-slate-100 rounded-[1.5rem] px-6 py-4 text-sm font-bold text-slate-900 outline-none"
                   />
                 </div>
 
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-purple-600">Stock Count</label>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-purple-600 ml-1">Stock</label>
                   <input
-                    type="number" required min="0"
-                    placeholder="e.g. 50"
+                    type="number" required min="0" placeholder="QTY"
                     value={formData.stock}
                     onChange={e => setFormData({ ...formData, stock: e.target.value })}
-                    className="w-full bg-purple-50/50 border border-purple-200 rounded-2xl px-4 py-2.5 text-xs font-bold text-purple-900 focus:outline-none focus:border-purple-600"
+                    className="w-full bg-purple-50/50 border border-purple-100 rounded-[1.5rem] px-6 py-4 text-sm font-black text-purple-700 outline-none focus:border-purple-600"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Description</label>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Description</label>
                 <textarea
-                  rows="2"
+                  rows="3" placeholder="Description..."
                   value={formData.description}
                   onChange={e => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full bg-slate-50 border rounded-2xl p-3 text-xs font-semibold"
+                  className="w-full bg-slate-50 border border-slate-100 rounded-[1.5rem] p-6 text-sm font-bold text-slate-900 outline-none"
                 />
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Image Upload</label>
-                <div className="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center">
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Item Image</label>
+                <div className="border-2 border-dashed border-slate-100 bg-slate-50/50 rounded-[2rem] p-8 text-center transition-colors hover:border-purple-200">
                   {imagePreview ? (
-                    <div className="relative h-28 rounded-xl overflow-hidden">
+                    <div className="relative h-40 rounded-2xl overflow-hidden shadow-lg">
                       <img src={imagePreview} className="w-full h-full object-cover" alt="Preview" />
-                      <button type="button" onClick={() => { setImagePreview(null); setFormData({ ...formData, imageFile: null }); }} className="absolute top-2 right-2 bg-slate-900/80 text-white p-1 rounded-lg"><X size={12} /></button>
+                      <button type="button" onClick={() => { setImagePreview(null); setFormData({ ...formData, imageFile: null }); }} className="absolute top-4 right-4 bg-slate-900/90 text-white w-8 h-8 rounded-xl flex items-center justify-center backdrop-blur-md active:scale-90"><X size={16} /></button>
                     </div>
                   ) : (
-                    <label className="cursor-pointer flex flex-col items-center gap-1">
-                      <Upload className="text-purple-600" size={24} />
-                      <span className="text-xs font-bold text-slate-600">Select Image from PC</span>
+                    <label className="cursor-pointer flex flex-col items-center gap-2 group">
+                      <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-purple-600 shadow-sm group-hover:scale-110 transition-transform"><Upload size={28} /></div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">Upload Image</span>
                       <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
                     </label>
                   )}
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="w-1/2 bg-slate-100 py-3 rounded-2xl text-xs font-bold">Cancel</button>
-                <button type="submit" disabled={submitting} className="w-1/2 bg-purple-600 text-white py-3 rounded-2xl text-xs font-black shadow-lg shadow-purple-200">
-                  {submitting ? <Loader2 size={16} className="animate-spin mx-auto" /> : (editingItem ? 'Update Item & Stock' : 'Save Food Item')}
+              <div className="flex gap-4 pt-6">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-5 rounded-2xl font-black text-[11px] uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition-all">Cancel</button>
+                <button type="submit" disabled={submitting} className="flex-1 bg-slate-900 text-white py-5 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl shadow-slate-200 hover:bg-purple-600 transition-all active:scale-95">
+                  {submitting ? <Loader2 size={18} className="animate-spin mx-auto" /> : (editingItem ? 'Update Item' : 'Add Item')}
                 </button>
               </div>
             </form>

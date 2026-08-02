@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
 // Public Pages
 import Home from './pages/Home';
@@ -15,6 +16,8 @@ import MainPage from './pages/PosMain';
 function App() {
   return (
     <Router>
+      <Toaster position="top-right" reverseOrder={false} />
+
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Home />} />

@@ -1,23 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import logoImg from "../assets/logo.png";
 import api from "../api/axios";
+import toast from "react-hot-toast"; // Toast එකතු කළා
 import { 
   Mail, 
   Lock, 
   ArrowRight, 
   Loader2, 
-  AlertCircle, 
   ChevronLeft,
   Eye,
-  EyeOff,
-  Info
+  EyeOff
 } from "lucide-react";
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-
   const infoMessage = location.state?.message;
 
   const [formData, setFormData] = useState({
@@ -27,30 +25,33 @@ const Login = () => {
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+
+  // Redirect වුණාම එන message එක toast එකක් විදිහට පෙන්වන්න
+  useEffect(() => {
+    if (infoMessage) {
+      toast.success(infoMessage);
+    }
+  }, [infoMessage]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (error) setError(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
+    const loadingToast = toast.loading("Authenticating...");
 
     try {
-      // Backend Login API Call
       const response = await api.post("/auth/login", formData);
 
       if (response.status === 200) {
         const { token, user } = response.data;
-
-        // Save Auth token and User Data in LocalStorage
         localStorage.setItem("token", token);
         localStorage.setItem("user", JSON.stringify(user));
 
-        // Redirect based on User Role
+        toast.success(`Welcome back, ${user.firstName || 'User'}!`, { id: loadingToast });
+
         if (user.role === "ADMIN") {
           navigate("/admin/dashboard");
         } else {
@@ -58,73 +59,65 @@ const Login = () => {
         }
       }
     } catch (err) {
-      setError(
-        err.response?.data?.message || "Login failed. Please check your credentials and try again."
-      );
+      const errorMsg = err.response?.data?.message || "Login failed. Please try again.";
+      toast.error(errorMsg, { id: loadingToast });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-900">
-      <div className="max-w-md w-full space-y-6">
+    <div className="min-h-screen bg-white flex items-center justify-center p-6 font-sans text-slate-900 relative overflow-hidden">
+      
+      {/* Background Decorative Glows */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-50/50 rounded-full blur-[120px] pointer-events-none -z-0" />
+      <div className="absolute bottom-[5%] right-[-5%] w-[400px] h-[400px] bg-indigo-50/30 rounded-full blur-[100px] pointer-events-none -z-0" />
+
+      <div className="max-w-[420px] w-full space-y-8 relative z-10 animate-in fade-in zoom-in-95 duration-500">
         
-        {/* Top Back Link & Logo */}
-        <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors">
-            <ChevronLeft size={16} />
-            Back to Home
+        {/* Top Branding & Back Link */}
+        <div className="flex flex-col items-center gap-6">
+          <Link to="/" className="p-2 bg-white rounded-2xl border border-slate-100 shadow-sm hover:border-purple-300 transition-all duration-300 group">
+            <img src={logoImg} alt="Logo" className="h-12 w-auto object-contain" />
           </Link>
-          <img src={logoImg} alt="Bloom Café Logo" className="h-10 w-auto object-contain" />
+          <div className="text-center space-y-1">
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight uppercase">
+              Sign In
+            </h1>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em]">
+              Access bloom café 
+            </p>
+          </div>
         </div>
 
-        {/* Main Card */}
-        <div className="bg-white border border-slate-200/80 rounded-3xl p-8 shadow-xl space-y-6">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-black text-slate-900">Welcome Back</h1>
-            <p className="text-xs font-semibold text-slate-400">Sign in to access your Bloom Café terminal</p>
-          </div>
-
-          {/* Info Banner (e.g. redirected after registration) */}
-          {infoMessage && (
-            <div className="p-3.5 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-3 text-blue-700 text-xs font-medium">
-              <Info size={18} className="shrink-0 mt-0.5" />
-              <span>{infoMessage}</span>
-            </div>
-          )}
-
-          {/* Error Banner */}
-          {error && (
-            <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-2xl flex items-start gap-3 text-rose-600 text-xs font-medium">
-              <AlertCircle size={18} className="shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Login Form Card */}
+        <div className="bg-white/80 backdrop-blur-xl border border-slate-100 rounded-[2.5rem] p-10 shadow-2xl shadow-purple-500/5 space-y-8">
+          
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email Field */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Email </label>
+              <div className="relative group">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-purple-600 transition-colors" size={18} />
                 <input
                   type="email"
                   name="email"
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  placeholder="cashier@bloomcafe.com"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-3 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-600/20 focus:border-purple-600 transition-all"
+                  placeholder="name@bloomcafe.com"
+                  className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:bg-white focus:ring-4 focus:ring-purple-500/5 focus:border-purple-600 transition-all"
                 />
               </div>
             </div>
 
             {/* Password Field */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <div className="space-y-2">
+              <div className="flex justify-between items-center px-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Password</label>
+              </div>
+              <div className="relative group">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-purple-600 transition-colors" size={18} />
                 <input
                   type={showPassword ? "text" : "password"}
                   name="password"
@@ -132,12 +125,12 @@ const Login = () => {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="••••••••"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-10 py-3 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-600/20 focus:border-purple-600 transition-all"
+                  className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl pl-12 pr-12 py-4 text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:bg-white focus:ring-4 focus:ring-purple-500/5 focus:border-purple-600 transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-900 transition-colors"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -148,29 +141,32 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 bg-purple-600 hover:bg-slate-900 text-white font-black py-3.5 rounded-2xl shadow-xl shadow-purple-200 transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-slate-900 hover:bg-purple-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-slate-200 hover:shadow-purple-200 transition-all duration-300 text-[11px] uppercase tracking-[0.2em] flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95 mt-4"
             >
               {loading ? (
-                <Loader2 size={18} className="animate-spin" />
+                <Loader2 size={20} className="animate-spin" />
               ) : (
                 <>
-                  <span>Sign In</span>
-                  <ArrowRight size={16} />
+                  <span>Initialize Session</span>
+                  <ArrowRight size={18} />
                 </>
               )}
             </button>
           </form>
 
-          <div className="text-center pt-2">
-            <p className="text-xs font-semibold text-slate-400">
-              Don't have an account?{" "}
-              <Link to="/register" className="text-purple-600 font-bold hover:underline">
-                Register here
-              </Link>
-            </p>
+          {/* Footer Link */}
+          <div className="text-center">
+            <Link to="/register" className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-purple-600 transition-colors">
+              New Staff Member? <span className="text-purple-600 underline underline-offset-4">Register</span>
+            </Link>
           </div>
-
         </div>
+
+        {/* Back Link */}
+        <Link to="/" className="flex items-center justify-center gap-2 text-[10px] font-bold text-slate-400 hover:text-slate-900 uppercase tracking-widest transition-all">
+          <ChevronLeft size={14} />
+          Return to Portal
+        </Link>
       </div>
     </div>
   );
