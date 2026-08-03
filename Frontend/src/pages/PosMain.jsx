@@ -74,9 +74,8 @@ const PosMain = () => {
     navigate('/login');
   };
 
-  // 🔴 FIXED: ADD TO CART WITH STOCK & AVAILABILITY CHECK
+  // ADD TO CART WITH STOCK & AVAILABILITY CHECK
   const addToCart = (item) => {
-    // 1. Availability & Stock Check
     if (!item.isAvailable) {
       toast.error(`${item.name} is currently unavailable!`);
       return;
@@ -89,7 +88,6 @@ const PosMain = () => {
     const existingItem = cart.find((cartItem) => cartItem.id === item.id);
     const currentQtyInCart = existingItem ? existingItem.quantity : 0;
 
-    // 2. Prevent Exceeding Stock Limit
     if (currentQtyInCart + 1 > item.stock) {
       toast.error(`Stock limit reached! Only ${item.stock} available.`, { duration: 2000 });
       return;
@@ -108,7 +106,7 @@ const PosMain = () => {
     toast.success(`${item.name} added`, { duration: 1000, position: 'bottom-left' });
   };
 
-  // 🔴 FIXED: QUANTITY UPDATE WITH STOCK LIMIT CHECK
+  // QUANTITY UPDATE WITH STOCK LIMIT CHECK
   const updateQuantity = (id, delta) => {
     const targetItem = foods.find((f) => f.id === id);
     const cartItem = cart.find((c) => c.id === id);
@@ -204,17 +202,30 @@ const PosMain = () => {
             </button>
           )}
 
-          <div className="hidden md:flex items-center gap-3 pl-4 border-l border-slate-100">
+          {/* 🟢 CLICKABLE PROFILE BUTTON */}
+          <button
+            onClick={() => navigate('/profile')}
+            className="hidden md:flex items-center gap-3 pl-4 border-l border-slate-100 hover:opacity-80 transition-all cursor-pointer group text-left"
+            title="View Profile & Shift Performance"
+          >
             <div className="text-right">
-              <p className="text-xs font-bold text-slate-900">{user.fullName || user.username || 'Staff'}</p>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{user.role || 'Cashier'}</p>
+              <p className="text-xs font-bold text-slate-900 group-hover:text-purple-600 transition-colors">
+                {user.fullName || user.username || 'Staff'}
+              </p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                {user.role || 'Cashier'}
+              </p>
             </div>
-            <div className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm">
-              {user.fullName ? user.fullName.charAt(0) : 'S'}
+            <div className="w-10 h-10 rounded-2xl bg-slate-900 group-hover:bg-purple-600 text-white flex items-center justify-center font-bold text-sm transition-colors shadow-sm">
+              {user.fullName ? user.fullName.charAt(0).toUpperCase() : 'S'}
             </div>
-          </div>
+          </button>
 
-          <button onClick={handleLogout} className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
+          <button 
+            onClick={handleLogout} 
+            className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+            title="Logout"
+          >
             <LogOut size={20} />
           </button>
         </div>
@@ -299,7 +310,7 @@ const PosMain = () => {
                         {item.category?.name || 'Item'}
                       </div>
 
-                      {/* 🔴 UNAVAILABLE / OUT OF STOCK BADGE */}
+                      {/* UNAVAILABLE / OUT OF STOCK BADGE */}
                       {isItemDisabled && (
                         <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center">
                           <span className="bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl shadow-lg">
