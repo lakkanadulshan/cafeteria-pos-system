@@ -251,10 +251,152 @@ const getPendingUsers = async (req, res) => {
   }
 };
 
+//  GET Profile Metrics
+const getProfile = async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        isActive: true,
+        isVerified: true,
+        createdAt: true,
+        orders: {
+          select: {
+            id: true,
+            totalAmount: true,
+            createdAt: true,
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "User profile not found" });
+    }
+
+    // Shift Performance Metrics
+    const totalOrdersCount = user.orders.length;
+    const totalSalesVolume = user.orders.reduce((sum, order) => sum + (Number(order.totalAmount) || 0), 0);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayOrders = user.orders.filter(order => new Date(order.createdAt) >= today);
+    const todaySalesVolume = todayOrders.reduce((sum, order) => sum + (Number(order.totalAmount) || 0), 0);
+
+    return res.status(200).json({
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        isActive: user.isActive,
+        isVerified: user.isVerified,
+        createdAt: user.createdAt,
+      },
+      stats: {
+        totalOrdersCount,
+        totalSalesVolume,
+        todayOrdersCount: todayOrders.length,
+        todaySalesVolume
+      }
+    });
+
+  } catch (error) {
+    console.error("Get Profile error:", error);
+    return res.status(500).json({ message: "Failed to fetch profile metrics" });
+  }
+};
+
+// 2. UPDATE Profile Name
+const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    let { fullName } = req.body;
+
+    if (!fullName) {
+      return res.status(400).json({ message: "Full Name is required" });
+    }
+
+    fullName = fullName.trim();
+    if (!fullName.match(/^[a-zA-Z ]+$/)) {
+      return res.status(400).json({ message: "Name can only contain letters and spaces" });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { fullName },
+      select: { id: true, email: true, fullName: true, role: true }
+    });
+
+    return res.status(200).json({
+      message: "Profile details updated!",
+      user: updatedUser
+    });
+
+  } catch (error) {
+    console.error("Update Profile error:", error);
+    return res.status(500).json({ message: "Failed to update profile" });
+  }
+};
+
+// 3. CHANGE  Password
+const changePassword = async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    let { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current and new passwords are required" });
+    }
+
+    currentPassword = currentPassword.trim();
+    newPassword = newPassword.trim();
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters long" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Incorrect current password" });
+    }
+
+    const newHashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newHashedPassword }
+    });
+
+    return res.status(200).json({
+      message: "Password updated successfully!"
+    });
+
+  } catch (error) {
+    console.error("Change Password error:", error);
+    return res.status(500).json({ message: "Failed to change password" });
+  }
+};
+
 module.exports = { 
   registerUser, 
   sendVerificationEmail, 
   verifyEmailToken, 
   LoginUser,
-  getPendingUsers
+  getPendingUsers,
+  getProfile,
+  updateProfile,
+  changePassword
 };
