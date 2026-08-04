@@ -58,30 +58,24 @@ const MenuManager = () => {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setFormData({ ...formData, imageFile: file });
+      setFormData(prev => ({ ...prev, imageFile: file }));
       setImagePreview(URL.createObjectURL(file));
       toast.success("Image selected");
     }
-  };
-
-  // Direct Cloudinary / Full HTTP URL එක ලබා ගනී
-  const getFullImageUrl = (path) => {
-    if (!path) return null;
-    return path;
   };
 
   const handleOpenModal = (item = null) => {
     if (item) {
       setEditingItem(item);
       setFormData({
-        name: item.name,
+        name: item.name || '',
         description: item.description || '',
-        price: item.price,
-        stock: item.stock,
-        categoryId: item.categoryId,
+        price: item.price || '',
+        stock: item.stock !== undefined ? item.stock : '',
+        categoryId: item.categoryId || '',
         imageFile: null
       });
-      setImagePreview(getFullImageUrl(item.imageUrl));
+      setImagePreview(item.imageUrl || null);
     } else {
       resetForm();
     }
@@ -104,20 +98,20 @@ const MenuManager = () => {
     postData.append('price', formData.price);
     postData.append('stock', formData.stock || 0);
     postData.append('categoryId', formData.categoryId);
+
+    // 🔴 Field name එක 'image' ලෙසම append වේ
     if (formData.imageFile) {
       postData.append('image', formData.imageFile);
     }
 
     try {
       if (editingItem) {
-        await api.put(`/menu/${editingItem.id}`, postData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        // 🟢 FIX: Manual headers අයින් කරන ලදී. Axios automatic boundary එක සෙට් කරයි.
+        await api.put(`/menu/${editingItem.id}`, postData);
         toast.success("Item updated successfully", { id: loadingToast });
       } else {
-        await api.post('/menu', postData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        // 🟢 FIX: Manual headers අයින් කරන ලදී.
+        await api.post('/menu', postData);
         toast.success("New food item added", { id: loadingToast });
       }
       
@@ -125,6 +119,7 @@ const MenuManager = () => {
       resetForm();
       fetchData();
     } catch (err) {
+      console.error("Submit error:", err);
       toast.error(err.response?.data?.message || "Operation failed", { id: loadingToast });
     } finally {
       setSubmitting(false);
@@ -235,13 +230,20 @@ const MenuManager = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
           {filteredItems.map(item => {
-            const itemImageUrl = getFullImageUrl(item.imageUrl);
             return (
               <div key={item.id} className="group bg-white border border-slate-100 rounded-[2.5rem] p-6 shadow-sm hover:shadow-2xl hover:shadow-purple-500/5 transition-all duration-500 flex flex-col justify-between">
                 <div className="space-y-5">
                   <div className="w-full h-52 rounded-[2rem] bg-slate-50 overflow-hidden relative border border-slate-50 shadow-inner">
-                    {itemImageUrl ? (
-                      <img src={itemImageUrl} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                    {item.imageUrl ? (
+                      <img 
+                        src={item.imageUrl} 
+                        alt={item.name} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        onError={(e) => {
+                          e.target.onerror = null; 
+                          e.target.src = 'https://via.placeholder.com/300x200?text=No+Image';
+                        }}
+                      />
                     ) : (
                       <div className="h-full w-full flex items-center justify-center text-slate-200"><Utensils size={48} strokeWidth={1} /></div>
                     )}
@@ -259,7 +261,7 @@ const MenuManager = () => {
                     <div className="flex items-center gap-4 mt-6">
                       <div className="flex flex-col">
                         <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Price</span>
-                        <span className="font-black text-slate-900 text-xl tracking-tighter">Rs. {parseFloat(item.price).toFixed(2)}</span>
+                        <span className="font-black text-slate-900 text-xl tracking-tighter">Rs. {parseFloat(item.price || 0).toFixed(2)}</span>
                       </div>
                       <div className={`flex flex-col border-l border-slate-100 pl-4`}>
                         <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Stock</span>

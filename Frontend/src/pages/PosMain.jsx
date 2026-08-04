@@ -56,12 +56,6 @@ const PosMain = () => {
     }
   };
 
-  // Direct Cloudinary / Full HTTP URL එක ලබා ගනී
-  const getFullImageUrl = (path) => {
-    if (!path) return null;
-    return path;
-  };
-
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -290,11 +284,15 @@ const PosMain = () => {
                     }`}
                   >
                     <div className="h-40 w-full rounded-2xl overflow-hidden mb-4 bg-slate-50 relative">
-                      {getFullImageUrl(item.imageUrl) ? (
+                      {item.imageUrl ? (
                         <img 
-                          src={getFullImageUrl(item.imageUrl)} 
+                          src={item.imageUrl} 
                           alt={item.name} 
                           className={`h-full w-full object-cover transition-transform duration-700 ${!isItemDisabled && 'group-hover:scale-110'}`} 
+                          onError={(e) => {
+                            e.target.onerror = null; 
+                            e.target.src = 'https://via.placeholder.com/300x200?text=No+Image';
+                          }}
                         />
                       ) : (
                         <div className="h-full w-full flex items-center justify-center text-slate-200"><Coffee size={40} /></div>
@@ -319,7 +317,7 @@ const PosMain = () => {
                     
                     <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-50">
                       <div>
-                        <p className="font-black text-slate-900 text-base">Rs. {Number(item.price).toFixed(2)}</p>
+                        <p className="font-black text-slate-900 text-base">Rs. {Number(item.price || 0).toFixed(2)}</p>
                         <p className={`text-[10px] font-bold flex items-center gap-1 ${item.stock <= 5 ? 'text-rose-500' : 'text-slate-400'}`}>
                           <Package size={12} /> Stock: {item.stock}
                         </p>
