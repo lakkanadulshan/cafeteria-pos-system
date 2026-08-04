@@ -90,7 +90,8 @@ const Home = () => {
               </h1>
 
               <p className="text-slate-500 text-base sm:text-lg max-w-lg leading-relaxed font-medium">
-Simplify every order, every day.              </p>
+                Simplify every order, every day.
+              </p>
 
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto pt-2">

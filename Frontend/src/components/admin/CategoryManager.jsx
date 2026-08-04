@@ -46,6 +46,13 @@ const CategoryManager = () => {
   };
 
   const handleDeleteCategory = async (id) => {
+    const targetId = parseInt(id, 10);
+    
+    if (isNaN(targetId)) {
+      toast.error("Invalid Category ID");
+      return;
+    }
+
     const result = await Swal.fire({
       title: 'Delete Category?',
       text: "All items linked to this category might be affected.",
@@ -54,13 +61,16 @@ const CategoryManager = () => {
       confirmButtonColor: '#6366f1',
       cancelButtonColor: '#94a3b8',
       confirmButtonText: 'Yes, Delete',
-      borderRadius: '24px'
+     
+      customClass: {
+        popup: 'rounded-[24px]' 
+      }
     });
 
     if (result.isConfirmed) {
       const loadingToast = toast.loading("Purging category...");
       try {
-        await api.delete(`/categories/${id}`);
+        await api.delete(`/categories/${targetId}`);
         toast.success("Category removed", { id: loadingToast });
         fetchCategories();
       } catch (err) {
