@@ -136,23 +136,25 @@ const PosMain = () => {
   const tax = subtotal * 0.08;
   const grandTotal = subtotal + tax;
 
+  // 🟢 FIX: Data Payload Parsing to prevent 400 Bad Request
   const handleCompleteOrder = async () => {
     if (cart.length === 0) return;
     setIsSubmitting(true);
     const loadingToast = toast.loading("Processing order...");
     try {
       const orderPayload = {
-        paymentMethod,
+        paymentMethod: paymentMethod || 'CASH',
         items: cart.map((item) => ({
-          menuItemId: item.id,
-          quantity: item.quantity,
-          price: item.price
+          menuItemId: parseInt(item.id, 10), // 👈 Parse as Integer
+          quantity: parseInt(item.quantity, 10) // 👈 Parse as Integer
         }))
       };
+
       await api.post('/orders', orderPayload);
+      
       setCart([]);
       toast.success("Order placed successfully!", { id: loadingToast });
-      fetchData(); // Sync updated stock
+      fetchData(); // Sync updated stock after order completion
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to complete order.', { id: loadingToast });
     } finally {
