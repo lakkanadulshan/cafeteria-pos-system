@@ -75,14 +75,14 @@ const createMenuItem = async (req, res) => {
         .json({ message: "Specified Category does not exist" });
     }
 
+    // CLOUDINARY CHANGE: req.file.path හි Direct Cloud URL එක ලැබෙයි
     let imageUrl = req.body.imageUrl || null;
     if (req.file) {
-      imageUrl = `/uploads/${req.file.filename}`;
+      imageUrl = req.file.path; 
     }
 
     const parsedStock = stock !== undefined ? parseInt(stock, 10) : 0;
     
-    // FIX: String boolean validation for form-data
     const parsedAvailability = isAvailable !== undefined 
       ? (isAvailable === true || isAvailable === "true") 
       : parsedStock > 0;
@@ -141,21 +141,20 @@ const updateMenuItem = async (req, res) => {
       }
     }
 
+    // CLOUDINARY CHANGE: req.file.path භාවිතය
     let imageUrl = existingItem.imageUrl;
     if (req.file) {
-      imageUrl = `/uploads/${req.file.filename}`;
+      imageUrl = req.file.path;
     } else if (req.body.imageUrl !== undefined) {
       imageUrl = req.body.imageUrl;
     }
 
     const parsedStock = stock !== undefined ? parseInt(stock, 10) : existingItem.stock;
     
-    // FIX: Safe string to boolean parsing for form-data
     let parsedAvailability = existingItem.isAvailable;
     if (isAvailable !== undefined) {
       parsedAvailability = (isAvailable === true || isAvailable === "true");
     } else if (stock !== undefined) {
-      // Auto enable if stock updated above 0, or disable if 0
       parsedAvailability = parsedStock > 0;
     }
 
