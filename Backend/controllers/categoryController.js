@@ -76,7 +76,7 @@ exports.deleteCategory = async (req, res) => {
       });
     }
 
-    await prisma.delete({ where: { id: categoryId } });
+    await prisma.category.delete({ where: { id: categoryId } });
     return res.status(200).json({ message: "Category deleted successfully" });
 
   } catch (error) {

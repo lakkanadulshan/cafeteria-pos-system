@@ -13,7 +13,8 @@ const {
   // 🟢 OTP Controller Functions
   requestPasswordResetOtp,
   verifyResetOtp,
-  resetPasswordWithOtp
+  resetPasswordWithOtp,
+  getSetupStatus, initialSetup
 } = require('../controllers/authController');
 
 const { authenticateToken } = require('../middleware/authMiddleware');
@@ -37,5 +38,11 @@ router.post('/forgot-password/reset-password', resetPasswordWithOtp);
 router.get('/profile', authenticateToken, getProfile);
 router.put('/profile', authenticateToken, updateProfile);
 router.put('/change-password', authenticateToken, changePassword);
+
+
+// Setup Status Route
+router.get('/setup-status', getSetupStatus);
+// Initial Setup Route
+router.post('/initial-setup', initialSetup);
 
 module.exports = router;

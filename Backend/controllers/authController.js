@@ -9,6 +9,72 @@ const prisma = new PrismaClient();
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// @desc    Check if initial setup (Admin creation) is required
+// @route   GET /api/auth/setup-status
+// @access  Public
+const getSetupStatus = async (req, res) => {
+  try {
+    const adminCount = await prisma.user.count({
+      where: { role: 'ADMIN' },
+    });
+
+    return res.status(200).json({ isSetupRequired: adminCount === 0 });
+  } catch (error) {
+    console.error('Setup status check error:', error);
+    return res.status(500).json({ message: 'Server error while checking setup status.' });
+  }
+};
+
+// @desc    Create First Admin User (Initial Setup Wizard)
+// @route   POST /api/auth/initial-setup
+// @access  Public
+const initialSetup = async (req, res) => {
+  try {
+    const existingAdmin = await prisma.user.findFirst({
+      where: { role: 'ADMIN' },
+    });
+
+    if (existingAdmin) {
+      return res.status(400).json({
+        message: 'Setup is already completed. An Admin account already exists.',
+      });
+    }
+
+    const { email, fullName, password } = req.body;
+
+    if (!email || !fullName || !password) {
+      return res.status(400).json({ message: 'All fields (fullName, email, password) are required.' });
+    }
+
+    
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const admin = await prisma.user.create({
+      data: {
+        email,
+        fullName,
+        passwordHash: hashedPassword,
+        role: 'ADMIN',
+        isActive: true,
+        isVerified: true,
+      },
+    });
+
+    return res.status(201).json({
+      message: 'Initial Admin account created successfully!',
+      admin: {
+        id: admin.id,
+        email: admin.email,
+        fullName: admin.fullName,
+        role: admin.role,
+      },
+    });
+  } catch (error) {
+    console.error('Initial setup error:', error);
+    return res.status(500).json({ message: 'Server error during initial setup.' });
+  }
+};
+
 // 1. User Registration (Pending Approval & Unverified state)
 const registerUser = async (req, res) => {
   try {
@@ -510,5 +576,7 @@ module.exports = {
   changePassword,
   requestPasswordResetOtp,
   verifyResetOtp,
-  resetPasswordWithOtp
+  resetPasswordWithOtp,
+  getSetupStatus,
+  initialSetup
 };
