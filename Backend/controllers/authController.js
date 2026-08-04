@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { sendVerificationLink } = require('../utils/sendEmail');
+const { sendOtpEmail } = require("../utils/sendEmail");
 
 const prisma = new PrismaClient();
 
@@ -179,7 +180,6 @@ const LoginUser = async (req, res) => {
 
     const user = await prisma.user.findUnique({ where: { email } });
     
-    // Debug Log (Terminal එකේ බලන්න user ව හොයාගත්තද කියලා)
     if (!user) {
       console.log(`Login Failed: User with email '${email}' not found.`);
       return res.status(401).json({ message: "Invalid email or password" });
@@ -251,7 +251,7 @@ const getPendingUsers = async (req, res) => {
   }
 };
 
-//  GET Profile Metrics
+// GET Profile Metrics
 const getProfile = async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
@@ -313,7 +313,7 @@ const getProfile = async (req, res) => {
   }
 };
 
-// 2. UPDATE Profile Name
+// UPDATE Profile Name
 const updateProfile = async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
@@ -345,7 +345,7 @@ const updateProfile = async (req, res) => {
   }
 };
 
-// 3. CHANGE  Password
+// CHANGE Password
 const changePassword = async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
@@ -390,6 +390,115 @@ const changePassword = async (req, res) => {
   }
 };
 
+// REQUEST OTP
+const requestPasswordResetOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email is required." });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ message: "No account found with this email." });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 Minutes validity
+
+    // Save OTP & Expiry in DB
+    await prisma.user.update({
+      where: { email },
+      data: {
+        resetOtp: otp,
+        resetOtpExpiresAt: expiresAt,
+      },
+    });
+
+    // Send Mail
+    await sendOtpEmail(email, otp);
+
+    res.json({ message: "OTP sent successfully to your email." });
+  } catch (error) {
+    console.error("OTP Request Error:", error);
+    res.status(500).json({ message: "Failed to send OTP. Please try again." });
+  }
+};
+
+// VERIFY OTP
+const verifyResetOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required." });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user || !user.resetOtp || !user.resetOtpExpiresAt) {
+      return res.status(400).json({ message: "Invalid or expired reset request." });
+    }
+
+    if (user.resetOtp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP code." });
+    }
+
+    if (new Date() > new Date(user.resetOtpExpiresAt)) {
+      return res.status(400).json({ message: "OTP has expired. Request a new one." });
+    }
+
+    res.json({ message: "OTP verified successfully." });
+  } catch (error) {
+    res.status(500).json({ message: "OTP verification failed." });
+  }
+};
+
+// RESET PASSWORD WITH OTP
+const resetPasswordWithOtp = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    console.log("Reset Request Payload:", { email, otp, newPassword: newPassword ? "PROVIDED" : "MISSING" });
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: "Email, OTP, and New Password are required." });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // OTP Validation
+    if (!user.resetOtp || user.resetOtp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP code." });
+    }
+
+    if (!user.resetOtpExpiresAt || new Date() > new Date(user.resetOtpExpiresAt)) {
+      return res.status(400).json({ message: "OTP has expired. Please request a new one." });
+    }
+
+    // Password Hash & Update
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { email },
+      data: {
+        passwordHash: hashedPassword,
+        resetOtp: null,
+        resetOtpExpiresAt: null,
+      },
+    });
+
+    return res.status(200).json({ message: "Password reset successful! Please log in." });
+  } catch (error) {
+    console.error("CRITICAL RESET PASSWORD ERROR:", error);
+    return res.status(500).json({ message: "Server error occurred while resetting password." });
+  }
+};
+
 module.exports = { 
   registerUser, 
   sendVerificationEmail, 
@@ -398,5 +507,8 @@ module.exports = {
   getPendingUsers,
   getProfile,
   updateProfile,
-  changePassword
+  changePassword,
+  requestPasswordResetOtp,
+  verifyResetOtp,
+  resetPasswordWithOtp
 };
