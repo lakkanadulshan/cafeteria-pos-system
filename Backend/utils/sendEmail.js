@@ -1,16 +1,22 @@
 const nodemailer = require("nodemailer");
 
+// 🟢 FIX 1: Connection/Socket Timeouts එකතු කිරීම
 const transporter = nodemailer.createTransport({
   service: "Gmail",
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  // Max 5 seconds timeout to prevent server hanging on blocked ports
+  connectionTimeout: 5000,
+  greetingTimeout: 3000,
+  socketTimeout: 5000,
 });
 
 // 1. Send Account Verification Link Email
 const sendVerificationLink = async (toEmail, token) => {
-  const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+  // 🟢 FIX 2: Live Vercel Frontend URL එක Fallback එක ලෙස යෙදීම
+  const clientUrl = process.env.CLIENT_URL || "https://cafeteria-pos-system-lac.vercel.app";
   const verificationUrl = `${clientUrl}/verify-email?token=${token}`;
 
   const mailOptions = {
@@ -65,7 +71,7 @@ const sendOtpEmail = async (toEmail, otp) => {
           We received a request to reset your password. Use the following 6-digit One-Time Password (OTP) to complete the verification:
         </p>
         
-        <div style="background-color: #f3e8ff; border: 1px border-purple-200; text-align: center; padding: 20px; border-radius: 10px; margin: 24px 0;">
+        <div style="background-color: #f3e8ff; border: 1px solid #e9d5ff; text-align: center; padding: 20px; border-radius: 10px; margin: 24px 0;">
           <span style="font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #7c3aed; font-family: monospace;">${otp}</span>
         </div>
 
