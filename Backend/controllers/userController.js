@@ -11,6 +11,7 @@ exports.getAllUsers = async (req, res) => {
         email: true,
         role: true,
         isActive: true,
+        isVerified: true,
         createdAt: true,
         updatedAt: true
       },
@@ -40,6 +41,12 @@ exports.updateUserRole = async (req, res) => {
       return res.status(400).json({ message: "Invalid role. Allowed values: ADMIN, CASHIER" });
     }
 
+    // 🟢 SECURITY FIX: Prevent Admin from demoting themselves to Cashier
+    const currentAdminId = req.user.userId || req.user.id;
+    if (currentAdminId === userId && role.toUpperCase() !== 'ADMIN') {
+      return res.status(400).json({ message: "You cannot demote your own account from ADMIN" });
+    }
+
     const existingUser = await prisma.user.findUnique({ where: { id: userId } });
     if (!existingUser) {
       return res.status(404).json({ message: "User not found" });
@@ -53,7 +60,8 @@ exports.updateUserRole = async (req, res) => {
         fullName: true,
         email: true,
         role: true,
-        isActive: true
+        isActive: true,
+        isVerified: true
       }
     });
 
@@ -87,7 +95,8 @@ exports.updateUserStatus = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    if (req.user.userId === userId && !isActive) {
+    const currentAdminId = req.user.userId || req.user.id;
+    if (currentAdminId === userId && !isActive) {
       return res.status(400).json({ message: "You cannot deactivate your own account" });
     }
 
@@ -99,7 +108,8 @@ exports.updateUserStatus = async (req, res) => {
         fullName: true,
         email: true,
         role: true,
-        isActive: true
+        isActive: true,
+        isVerified: true
       }
     });
 

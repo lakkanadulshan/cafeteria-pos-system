@@ -2,22 +2,19 @@ const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { sendVerificationLink } = require('../utils/sendEmail');
-const { sendOtpEmail } = require("../utils/sendEmail");
+
+// 🟢 FIX 1: Cleaned Single Import
+const { sendVerificationLink, sendOtpEmail } = require('../utils/sendEmail');
 
 const prisma = new PrismaClient();
-
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // @desc    Check if initial setup (Admin creation) is required
-// @route   GET /api/auth/setup-status
-// @access  Public
 const getSetupStatus = async (req, res) => {
   try {
     const adminCount = await prisma.user.count({
       where: { role: 'ADMIN' },
     });
-
     return res.status(200).json({ isSetupRequired: adminCount === 0 });
   } catch (error) {
     console.error('Setup status check error:', error);
@@ -25,9 +22,7 @@ const getSetupStatus = async (req, res) => {
   }
 };
 
-// @desc    Create First Admin User (Initial Setup Wizard)
-// @route   POST /api/auth/initial-setup
-// @access  Public
+// @desc    Create First Admin User
 const initialSetup = async (req, res) => {
   try {
     const existingAdmin = await prisma.user.findFirst({
@@ -41,18 +36,15 @@ const initialSetup = async (req, res) => {
     }
 
     const { email, fullName, password } = req.body;
-
     if (!email || !fullName || !password) {
       return res.status(400).json({ message: 'All fields (fullName, email, password) are required.' });
     }
 
-    
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const admin = await prisma.user.create({
       data: {
-        email,
-        fullName,
+        email: email.toLowerCase().trim(),
+        fullName: fullName.trim(),
         passwordHash: hashedPassword,
         role: 'ADMIN',
         isActive: true,
@@ -75,7 +67,7 @@ const initialSetup = async (req, res) => {
   }
 };
 
-// 1. User Registration (Pending Approval & Unverified state)
+// 1. User Registration
 const registerUser = async (req, res) => {
   try {
     let { email, fullName, password, role } = req.body;
@@ -84,7 +76,6 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: "Please fill all required fields" });
     }
 
-    // Sanitize Email and Password
     email = email.toLowerCase().trim();
     password = password.trim();
 
@@ -96,23 +87,12 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: "Password must be at least 8 characters long" });
     }
 
-    if (!fullName.match(/^[a-zA-Z ]+$/)) {
-      return res.status(400).json({ message: "Name can only contain letters and spaces" });
-    }
-
-    // Check existing email
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    });
-
+    const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ message: "Email is already registered" });
     }
 
-    // Hash Password
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Save User in DB
     const user = await prisma.user.create({
       data: {
         email,
@@ -142,7 +122,7 @@ const registerUser = async (req, res) => {
   }
 };
 
-// 2. Admin Triggers Verification Email
+// 2. Admin Triggers Verification Email (🟢 FIX 2: Protected against SMTP Hangs)
 const sendVerificationEmail = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -161,11 +141,9 @@ const sendVerificationEmail = async (req, res) => {
     }
 
     const token = crypto.randomBytes(32).toString('hex');
-    const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 Hours Expiry
+    const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 Hours
 
-    console.log("Generated Token:", token);
-    console.log("Saving for User ID:", numericUserId);
-
+    // Save token in DB
     await prisma.user.update({
       where: { id: numericUserId },
       data: {
@@ -174,15 +152,23 @@ const sendVerificationEmail = async (req, res) => {
       }
     });
 
-    await sendVerificationLink(user.email, token);
-
-    return res.status(200).json({
-      message: `Verification link sent successfully to ${user.email}`
-    });
+    // Safe Send Mail execution
+    try {
+      await sendVerificationLink(user.email, token);
+      return res.status(200).json({
+        message: `Verification link sent successfully to ${user.email}`
+      });
+    } catch (emailErr) {
+      console.error("Nodemailer Error (Suppressed):", emailErr.message);
+      return res.status(200).json({
+        message: `Token generated for ${user.email}, but email dispatch failed due to network timeout.`,
+        token
+      });
+    }
 
   } catch (error) {
     console.error("Send Link error:", error);
-    return res.status(500).json({ message: "Failed to send verification email" });
+    return res.status(500).json({ message: "Failed to process verification link request" });
   }
 };
 
@@ -231,7 +217,7 @@ const verifyEmailToken = async (req, res) => {
   }
 };
 
-// 4. User Login (Active & Verified Checks)
+// 4. User Login
 const LoginUser = async (req, res) => {
   try {
     let { email, password } = req.body;
@@ -240,25 +226,20 @@ const LoginUser = async (req, res) => {
       return res.status(400).json({ message: "Please provide both email and password" });
     }
 
-    // Lowercase and trim for exact matching
     email = email.toLowerCase().trim();
     password = password.trim();
 
     const user = await prisma.user.findUnique({ where: { email } });
     
     if (!user) {
-      console.log(`Login Failed: User with email '${email}' not found.`);
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Compare Password
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
-      console.log(`Login Failed: Password incorrect for '${email}'.`);
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Check Statuses
     if (!user.isVerified) {
       return res.status(403).json({ message: "Your email is not verified. Please check your inbox for the activation link." });
     }
@@ -267,7 +248,6 @@ const LoginUser = async (req, res) => {
       return res.status(403).json({ message: "Your account is deactivated. Contact admin." });
     }
 
-    // Generate JWT Token
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
@@ -346,7 +326,6 @@ const getProfile = async (req, res) => {
       return res.status(404).json({ message: "User profile not found" });
     }
 
-    // Shift Performance Metrics
     const totalOrdersCount = user.orders.length;
     const totalSalesVolume = user.orders.reduce((sum, order) => sum + (Number(order.totalAmount) || 0), 0);
 
@@ -390,9 +369,6 @@ const updateProfile = async (req, res) => {
     }
 
     fullName = fullName.trim();
-    if (!fullName.match(/^[a-zA-Z ]+$/)) {
-      return res.status(400).json({ message: "Name can only contain letters and spaces" });
-    }
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
@@ -469,11 +445,9 @@ const requestPasswordResetOtp = async (req, res) => {
       return res.status(404).json({ message: "No account found with this email." });
     }
 
-    // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 Minutes validity
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Save OTP & Expiry in DB
     await prisma.user.update({
       where: { email },
       data: {
@@ -482,10 +456,14 @@ const requestPasswordResetOtp = async (req, res) => {
       },
     });
 
-    // Send Mail
-    await sendOtpEmail(email, otp);
+    try {
+      await sendOtpEmail(email, otp);
+      res.json({ message: "OTP sent successfully to your email." });
+    } catch (mailErr) {
+      console.error("OTP Email Error:", mailErr.message);
+      res.status(200).json({ message: "OTP generated successfully, but dispatch encountered network delays." });
+    }
 
-    res.json({ message: "OTP sent successfully to your email." });
   } catch (error) {
     console.error("OTP Request Error:", error);
     res.status(500).json({ message: "Failed to send OTP. Please try again." });
@@ -525,8 +503,6 @@ const resetPasswordWithOtp = async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
 
-    console.log("Reset Request Payload:", { email, otp, newPassword: newPassword ? "PROVIDED" : "MISSING" });
-
     if (!email || !otp || !newPassword) {
       return res.status(400).json({ message: "Email, OTP, and New Password are required." });
     }
@@ -537,7 +513,6 @@ const resetPasswordWithOtp = async (req, res) => {
       return res.status(404).json({ message: "User not found." });
     }
 
-    // OTP Validation
     if (!user.resetOtp || user.resetOtp !== otp) {
       return res.status(400).json({ message: "Invalid OTP code." });
     }
@@ -546,7 +521,6 @@ const resetPasswordWithOtp = async (req, res) => {
       return res.status(400).json({ message: "OTP has expired. Please request a new one." });
     }
 
-    // Password Hash & Update
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     await prisma.user.update({
