@@ -54,7 +54,7 @@ const getMenuItemById = async (req, res) => {
   }
 };
 
-// 3. Create New Menu Item (Admin Only)
+// 3. Create New Menu Item
 const createMenuItem = async (req, res) => {
   try {
     const { name, description, price, categoryId, stock, isAvailable } = req.body;
@@ -75,7 +75,7 @@ const createMenuItem = async (req, res) => {
         .json({ message: "Specified Category does not exist" });
     }
 
-    // CLOUDINARY CHANGE: req.file.path හි Direct Cloud URL එක ලැබෙයි
+    // Cloudinary direct secure URL එක assign කර ගැනීම
     let imageUrl = req.body.imageUrl || null;
     if (req.file) {
       imageUrl = req.file.path; 
@@ -100,16 +100,12 @@ const createMenuItem = async (req, res) => {
       include: { category: true },
     });
 
-    return res.status(201).json({
-      message: "Menu item created successfully",
-      item: newItem,
-    });
+    return res.status(201).json(newItem);
   } catch (error) {
     console.error("Error creating menu item:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error", error: error.message });
   }
 };
-
 // 4. Update Menu Item (Admin Only)
 const updateMenuItem = async (req, res) => {
   try {
