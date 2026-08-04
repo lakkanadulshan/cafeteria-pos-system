@@ -12,72 +12,79 @@ exports.createOrder = async (req, res) => {
     }
 
     // Transaction - Verify stock, calculate total, create order & auto-deduct stock
-    const newOrder = await prisma.$transaction(async (tx) => {
-      let totalAmount = 0;
-      const orderItemsData = [];
+    // 🟢 FIX: Timeout එක 20000ms (Seconds 20) දක්වා වැඩි කරන ලදී.
+    const newOrder = await prisma.$transaction(
+      async (tx) => {
+        let totalAmount = 0;
+        const orderItemsData = [];
 
-      for (const item of items) {
-        const menuItemIdParsed = parseInt(item.menuItemId, 10);
-        const orderQty = parseInt(item.quantity, 10);
+        for (const item of items) {
+          const menuItemIdParsed = parseInt(item.menuItemId, 10);
+          const orderQty = parseInt(item.quantity, 10);
 
-        const menuItem = await tx.menuItem.findUnique({
-          where: { id: menuItemIdParsed }
-        });
+          const menuItem = await tx.menuItem.findUnique({
+            where: { id: menuItemIdParsed }
+          });
 
-        if (!menuItem) {
-          throw new Error(`Menu Item with ID ${item.menuItemId} not found`);
+          if (!menuItem) {
+            throw new Error(`Menu Item with ID ${item.menuItemId} not found`);
+          }
+
+          if (!menuItem.isAvailable) {
+            throw new Error(`Menu Item '${menuItem.name}' is currently unavailable/out of stock`);
+          }
+
+          // Check stock capacity
+          if (menuItem.stock < orderQty) {
+            throw new Error(`Insufficient stock for '${menuItem.name}'. Remaining: ${menuItem.stock}`);
+          }
+
+          const itemPrice = parseFloat(menuItem.price);
+          const subtotal = itemPrice * orderQty;
+          totalAmount += subtotal;
+
+          orderItemsData.push({
+            menuItemId: menuItem.id,
+            quantity: orderQty,
+            price: itemPrice 
+          });
+
+          // 👈 AUTO DEDUCT STOCK & Auto-Toggle availability if stock hits 0
+          const updatedStock = menuItem.stock - orderQty;
+          await tx.menuItem.update({
+            where: { id: menuItem.id },
+            data: {
+              stock: { decrement: orderQty },
+              isAvailable: updatedStock > 0
+            }
+          });
         }
 
-        if (!menuItem.isAvailable) {
-          throw new Error(`Menu Item '${menuItem.name}' is currently unavailable/out of stock`);
-        }
-
-        // Check stock capacity
-        if (menuItem.stock < orderQty) {
-          throw new Error(`Insufficient stock for '${menuItem.name}'. Remaining: ${menuItem.stock}`);
-        }
-
-        const itemPrice = parseFloat(menuItem.price);
-        const subtotal = itemPrice * orderQty;
-        totalAmount += subtotal;
-
-        orderItemsData.push({
-          menuItemId: menuItem.id,
-          quantity: orderQty,
-          price: itemPrice 
-        });
-
-        // 👈 AUTO DEDUCT STOCK & Auto-Toggle availability if stock hits 0
-        const updatedStock = menuItem.stock - orderQty;
-        await tx.menuItem.update({
-          where: { id: menuItem.id },
+        // Create Order in DB
+        return await tx.order.create({
           data: {
-            stock: { decrement: orderQty },
-            isAvailable: updatedStock > 0
+            totalAmount: totalAmount,
+            paymentMethod: paymentMethod || 'CASH',
+            userId: userId,
+            orderItems: {
+              create: orderItemsData
+            }
+          },
+          include: {
+            orderItems: {
+              include: { menuItem: true }
+            },
+            user: {
+              select: { id: true, fullName: true, email: true, role: true }
+            }
           }
         });
+      },
+      {
+        maxWait: 5000, 
+        timeout: 20000 
       }
-
-      // Create Order in DB
-      return await tx.order.create({
-        data: {
-          totalAmount: totalAmount,
-          paymentMethod: paymentMethod || 'CASH',
-          userId: userId,
-          orderItems: {
-            create: orderItemsData
-          }
-        },
-        include: {
-          orderItems: {
-            include: { menuItem: true }
-          },
-          user: {
-            select: { id: true, fullName: true, email: true, role: true }
-          }
-        }
-      });
-    });
+    );
 
     return res.status(201).json({
       message: "Order placed successfully",
