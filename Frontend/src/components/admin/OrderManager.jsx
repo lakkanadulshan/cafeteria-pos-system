@@ -1,18 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast'; 
 import Swal from 'sweetalert2'; 
 import { 
   ShoppingBag, 
-  Search, 
   Calendar, 
   Filter, 
   Eye, 
   Printer, 
   Loader2, 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
   X,
   CreditCard,
   Banknote,
@@ -32,11 +28,8 @@ const OrderManager = () => {
   const [loadingReceipt, setLoadingReceipt] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  useEffect(() => {
-    fetchOrders();
-  }, [startDate, endDate, statusFilter]);
-
-  const fetchOrders = async () => {
+  // 🟢 useCallback added to optimize fetch cycle
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
       const params = {};
@@ -51,7 +44,11 @@ const OrderManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [startDate, endDate, statusFilter]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   const handleViewReceipt = async (orderId) => {
     setLoadingReceipt(true);
@@ -101,8 +98,33 @@ const OrderManager = () => {
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-10">
       
+      {/* 🟢 PRINT-ONLY STYLES (Print කරද්දී Receipt එක විතරක් Thermal Receipt Standard එකට Print වෙනවා) */}
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #printable-receipt, #printable-receipt * {
+            visibility: visible;
+          }
+          #printable-receipt {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            padding: 0;
+            margin: 0;
+            box-shadow: none !important;
+            border: none !important;
+          }
+          .print-hide {
+            display: none !important;
+          }
+        }
+      `}</style>
+
       {/* --- 🟢 FILTER MODULE --- */}
-      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6">
+      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6 print-hide">
         
         <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
           <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3">
@@ -151,7 +173,7 @@ const OrderManager = () => {
       </div>
 
       {/* --- 🟢 ORDERS TABLE --- */}
-      <div className="bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl shadow-slate-200/40 overflow-hidden">
+      <div className="bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl shadow-slate-200/40 overflow-hidden print-hide">
         {loading ? (
           <div className="py-32 text-center">
             <Loader2 size={40} className="animate-spin text-purple-600 mx-auto mb-4" />
@@ -239,11 +261,12 @@ const OrderManager = () => {
       {/* --- 🟢 DIGITAL RECEIPT MODAL --- */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
-          <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-xl animate-in fade-in duration-300" onClick={() => setIsModalOpen(false)}></div>
-          <div className="bg-white border border-slate-100 rounded-[3rem] max-w-sm w-full p-10 shadow-2xl relative z-10 animate-in zoom-in-95 duration-500 overflow-hidden">
+          <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-xl animate-in fade-in duration-300 print-hide" onClick={() => setIsModalOpen(false)}></div>
+          
+          <div id="printable-receipt" className="bg-white border border-slate-100 rounded-[3rem] max-w-sm w-full p-10 shadow-2xl relative z-10 animate-in zoom-in-95 duration-500 overflow-hidden">
             
-            <div className="flex justify-between items-center mb-10 print:hidden">
-              <h3 className="font-black text-slate-900 text-2xl uppercase tracking-tighter ">Bill Preview</h3>
+            <div className="flex justify-between items-center mb-10 print-hide">
+              <h3 className="font-black text-slate-900 text-2xl uppercase tracking-tighter">Bill Preview</h3>
               <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 bg-slate-50 text-slate-400 hover:text-rose-500 rounded-xl flex items-center justify-center transition-all active:scale-90"><X size={20} /></button>
             </div>
 
@@ -255,7 +278,7 @@ const OrderManager = () => {
               <div className="font-sans space-y-8">
                 
                 {/* Brand Header */}
-                <div className="text-center space-y-2 pb-6 border-b border-dashed border-slate-100">
+                <div className="text-center space-y-2 pb-6 border-b border-dashed border-slate-200">
                   <h2 className="font-black text-2xl text-slate-900 tracking-tighter uppercase leading-none">bloom café<span className="text-purple-600">.</span></h2>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">Matrix Terminal #01</p>
                 </div>
@@ -279,7 +302,7 @@ const OrderManager = () => {
                 </div>
 
                 {/* Line Items */}
-                <div className="space-y-4 pt-4 border-t border-slate-50">
+                <div className="space-y-4 pt-4 border-t border-slate-100">
                   {selectedOrder.orderItems?.map((item) => (
                     <div key={item.id} className="flex justify-between group">
                       <div>
@@ -302,7 +325,7 @@ const OrderManager = () => {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-3 pt-6 print:hidden">
+                <div className="flex gap-3 pt-6 print-hide">
                   {selectedOrder.status !== 'CANCELLED' && (
                     <button
                       onClick={() => handleUpdateStatus(selectedOrder.id, 'CANCELLED')}
