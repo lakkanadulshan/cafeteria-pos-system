@@ -20,10 +20,6 @@ import {
   Package
 } from 'lucide-react';
 
-const BACKEND_ORIGIN = api.defaults.baseURL 
-  ? new URL(api.defaults.baseURL).origin 
-  : 'http://localhost:3000';
-
 const PosMain = () => {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -60,11 +56,10 @@ const PosMain = () => {
     }
   };
 
+  // Direct Cloudinary / Full HTTP URL එක ලබා ගනී
   const getFullImageUrl = (path) => {
     if (!path) return null;
-    if (path.startsWith('http')) return path;
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
-    return `${BACKEND_ORIGIN}${cleanPath}`;
+    return path;
   };
 
   const handleLogout = () => {
@@ -202,7 +197,7 @@ const PosMain = () => {
             </button>
           )}
 
-          {/* 🟢 CLICKABLE PROFILE BUTTON */}
+          {/* CLICKABLE PROFILE BUTTON */}
           <button
             onClick={() => navigate('/profile')}
             className="hidden md:flex items-center gap-3 pl-4 border-l border-slate-100 hover:opacity-80 transition-all cursor-pointer group text-left"

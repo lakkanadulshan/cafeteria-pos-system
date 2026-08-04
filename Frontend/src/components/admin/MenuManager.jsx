@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api, { BACKEND_ORIGIN } from '../../api/axios';
+import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import Swal from 'sweetalert2';
 import { 
@@ -9,8 +9,6 @@ import {
   Loader2, 
   Upload, 
   X, 
-  CheckCircle2, 
-  XCircle,
   Search,
   Package,
   Edit3,
@@ -66,11 +64,10 @@ const MenuManager = () => {
     }
   };
 
+  // Direct Cloudinary / Full HTTP URL එක ලබා ගනී
   const getFullImageUrl = (path) => {
     if (!path) return null;
-    if (path.startsWith('http')) return path;
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
-    return `${BACKEND_ORIGIN}${cleanPath}`;
+    return path;
   };
 
   const handleOpenModal = (item = null) => {
@@ -184,7 +181,7 @@ const MenuManager = () => {
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       
-      {/* --- 🟢 FILTER & ACTION BAR --- */}
+      {/* FILTER & ACTION BAR */}
       <div className="flex flex-col lg:flex-row justify-between items-center gap-6 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
         <div className="flex flex-col md:flex-row items-center gap-4 w-full lg:w-auto">
           <div className="relative w-full md:w-80 group">
@@ -221,7 +218,7 @@ const MenuManager = () => {
         </button>
       </div>
 
-      {/* --- 🟢 MENU GRID --- */}
+      {/* MENU GRID */}
       {loading ? (
         <div className="py-32 text-center">
           <Loader2 size={40} className="animate-spin text-purple-600 mx-auto mb-4" />
@@ -310,7 +307,7 @@ const MenuManager = () => {
         </div>
       )}
 
-      {/* --- 🟢 ADD / EDIT MODAL --- */}
+      {/* ADD / EDIT MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
           <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-xl animate-in fade-in duration-300" onClick={() => setIsModalOpen(false)}></div>
