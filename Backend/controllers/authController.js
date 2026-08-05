@@ -110,12 +110,11 @@ const registerUser = async (req, res) => {
       }
     });
 
-    // Send Verification Email immediately after creation
-    try {
-      await sendVerificationLink(user.email, token);
-    } catch (mailError) {
+    // Send Verification Email immediately after creation (fire-and-forget)
+    // Do not await here so a slow/failed email provider cannot block registration.
+    sendVerificationLink(user.email, token).catch((mailError) => {
       console.error("Auto Verification Email Dispatch Failed:", mailError);
-    }
+    });
 
     return res.status(201).json({
       message: "Registration successful! Verification email has been sent.",
