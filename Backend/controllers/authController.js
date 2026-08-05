@@ -110,14 +110,20 @@ const registerUser = async (req, res) => {
       }
     });
 
-    // Send Verification Email immediately after creation (fire-and-forget)
-    // Do not await here so a slow/failed email provider cannot block registration.
-    sendVerificationLink(user.email, token).catch((mailError) => {
+    let verificationEmailSent = false;
+
+    try {
+      await sendVerificationLink(user.email, token);
+      verificationEmailSent = true;
+    } catch (mailError) {
       console.error("Auto Verification Email Dispatch Failed:", mailError);
-    });
+    }
 
     return res.status(201).json({
-      message: "Registration successful! Verification email has been sent.",
+      message: verificationEmailSent
+        ? "Registration successful! Verification email has been sent."
+        : "Registration successful, but the verification email could not be sent right now. Please contact admin or resend the link.",
+      verificationEmailSent,
       user: {
         id: user.id,
         email: user.email,
