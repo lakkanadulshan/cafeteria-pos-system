@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
-// 🟢 FIX 1: Cleaned Single Import
+// 🟢 Single Cleaned Import
 const { sendVerificationLink, sendOtpEmail } = require('../utils/sendEmail');
 
 const prisma = new PrismaClient();
@@ -67,7 +67,7 @@ const initialSetup = async (req, res) => {
   }
 };
 
-// 1. User Registration
+// 1. User Registration (Non-blocking Background Email Dispatch)
 const registerUser = async (req, res) => {
   try {
     let { email, fullName, password, role } = req.body;
@@ -110,20 +110,9 @@ const registerUser = async (req, res) => {
       }
     });
 
-    let verificationEmailSent = false;
-
-    try {
-      await sendVerificationLink(user.email, token);
-      verificationEmailSent = true;
-    } catch (mailError) {
-      console.error("Auto Verification Email Dispatch Failed:", mailError);
-    }
-
-    return res.status(201).json({
-      message: verificationEmailSent
-        ? "Registration successful! Verification email has been sent."
-        : "Registration successful, but the verification email could not be sent right now. Please contact admin or resend the link.",
-      verificationEmailSent,
+    // 🟢 1. ක්ෂණිකව Frontend එකට Response එක යැවීම
+    res.status(201).json({
+      message: "Registration successful! Verification email is being dispatched.",
       user: {
         id: user.id,
         email: user.email,
@@ -133,6 +122,11 @@ const registerUser = async (req, res) => {
         isVerified: user.isVerified
       }
     });
+
+    // 🟢 2. Background Email Dispatch (HTTP Hold නොවේ)
+    sendVerificationLink(user.email, token)
+      .then(() => console.log(`Auto verification email sent to ${user.email}`))
+      .catch((mailError) => console.error("Auto Verification Email Dispatch Failed:", mailError.message));
 
   } catch (error) {
     console.error("Registration error:", error);
@@ -170,11 +164,13 @@ const sendVerificationEmail = async (req, res) => {
       }
     });
 
+    // Instant Response
     res.status(200).json({
       message: `Verification token generated! Dispatching email to ${user.email}...`,
       token
     });
 
+    // Background Dispatch
     sendVerificationLink(user.email, token)
       .then(() => console.log(`Verification mail sent to ${user.email}`))
       .catch((err) => console.error("Background Mail Error:", err.message));
@@ -445,7 +441,7 @@ const changePassword = async (req, res) => {
   }
 };
 
-// REQUEST OTP
+// REQUEST OTP (Non-blocking Background Fix)
 const requestPasswordResetOtp = async (req, res) => {
   try {
     const { email } = req.body;
@@ -459,7 +455,7 @@ const requestPasswordResetOtp = async (req, res) => {
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 Minutes Expiry
 
     await prisma.user.update({
       where: { email },
@@ -469,13 +465,15 @@ const requestPasswordResetOtp = async (req, res) => {
       },
     });
 
-    try {
-      await sendOtpEmail(email, otp);
-      res.json({ message: "OTP sent successfully to your email." });
-    } catch (mailErr) {
-      console.error("OTP Email Error:", mailErr.message);
-      res.status(200).json({ message: "OTP generated successfully, but dispatch encountered network delays." });
-    }
+    // 🟢 1. Instant response to UI
+    res.status(200).json({ 
+      message: "OTP generated successfully! Dispatching code to your email." 
+    });
+
+    // 🟢 2. Background Dispatch
+    sendOtpEmail(email, otp)
+      .then(() => console.log(`Reset OTP successfully sent to ${email}`))
+      .catch((mailErr) => console.error("Background OTP Dispatch Error:", mailErr.message));
 
   } catch (error) {
     console.error("OTP Request Error:", error);
