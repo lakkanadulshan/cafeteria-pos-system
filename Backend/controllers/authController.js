@@ -92,6 +92,10 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: "Email is already registered" });
     }
 
+    // Generate Token & Expiry Date
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
       data: {
@@ -100,12 +104,21 @@ const registerUser = async (req, res) => {
         passwordHash: hashedPassword,
         role: role || 'CASHIER',
         isActive: false,   
-        isVerified: false  
+        isVerified: false,
+        verificationToken: token,       
+        tokenExpiresAt: tokenExpiresAt  
       }
     });
 
+    // Send Verification Email immediately after creation
+    try {
+      await sendVerificationLink(user.email, token);
+    } catch (mailError) {
+      console.error("Auto Verification Email Dispatch Failed:", mailError);
+    }
+
     return res.status(201).json({
-      message: "Registration successful! Awaiting verification email.",
+      message: "Registration successful! Verification email has been sent.",
       user: {
         id: user.id,
         email: user.email,

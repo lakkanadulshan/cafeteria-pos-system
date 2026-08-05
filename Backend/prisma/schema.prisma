@@ -1,28 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
-// 1. Users Table (Admin & Cashier Staff Management)
 model User {
   id                Int       @id @default(autoincrement())
   email             String    @unique
   fullName          String?
   passwordHash      String
-  role              Role      @default(CASHIER) // ADMIN or CASHIER
-  isActive          Boolean   @default(false)   
-  isVerified        Boolean   @default(false)   
+  role              Role      @default(CASHIER)
+  isActive          Boolean   @default(false)
+  isVerified        Boolean   @default(false)
   verificationToken String?
   tokenExpiresAt    DateTime?
-  resetOtp         String?
+  resetOtp          String?
   resetOtpExpiresAt DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   orders            Order[]
+}
+
+model Category {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  menuItems MenuItem[]
+}
+
+model MenuItem {
+  id          Int         @id @default(autoincrement())
+  name        String
+  description String?
+  price       Decimal     @db.Decimal(10, 2)
+  stock       Int         @default(0)
+  imageUrl    String?
+  isAvailable Boolean     @default(true)
+  categoryId  Int
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  category    Category    @relation(fields: [categoryId], references: [id])
+  orderItems  OrderItem[]
+
+  @@index([categoryId], map: "MenuItem_categoryId_fkey")
+}
+
+model Order {
+  id            Int         @id @default(autoincrement())
+  totalAmount   Decimal     @db.Decimal(10, 2)
+  paymentMethod String      @default("CASH")
+  status        OrderStatus @default(COMPLETED)
+  createdAt     DateTime    @default(now())
+  userId        Int
+  user          User        @relation(fields: [userId], references: [id])
+  orderItems    OrderItem[]
+
+  @@index([userId], map: "Order_userId_fkey")
+}
+
+model OrderItem {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  menuItemId Int
+  quantity   Int
+  price      Decimal  @db.Decimal(10, 2)
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([menuItemId], map: "OrderItem_menuItemId_fkey")
+  @@index([orderId], map: "OrderItem_orderId_fkey")
 }
 
 enum Role {
@@ -30,59 +80,8 @@ enum Role {
   CASHIER
 }
 
-// 2. Category Table 
-model Category {
-  id        Int        @id @default(autoincrement())
-  name      String     @unique
-  menuItems MenuItem[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-}
-
-// 3. Menu Items Table 
-model MenuItem {
-  id          Int         @id @default(autoincrement())
-  name        String
-  description String?
-  price       Decimal     @db.Decimal(10, 2)
-  stock       Int         @default(0) 
-  imageUrl    String?
-  isAvailable Boolean     @default(true)
-  
-  // Category Relation
-  categoryId  Int
-  category    Category    @relation(fields: [categoryId], references: [id])
-  
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  orderItems  OrderItem[]
-}
-
-// 4. Orders Table (Checkout & Reporting)
-model Order {
-  id            Int         @id @default(autoincrement())
-  totalAmount   Decimal     @db.Decimal(10, 2)
-  paymentMethod String      @default("CASH") // e.g., 'CASH', 'CARD'
-  status        OrderStatus @default(COMPLETED)
-  createdAt     DateTime    @default(now())
-  userId        Int
-  user          User        @relation(fields: [userId], references: [id])
-  orderItems    OrderItem[]
-}
-
 enum OrderStatus {
   PENDING
   COMPLETED
   CANCELLED
-}
-
-// 5. Order Items Table (Cart Items)
-model OrderItem {
-  id         Int      @id @default(autoincrement())
-  orderId    Int
-  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  menuItemId Int
-  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
-  quantity   Int
-  price      Decimal  @db.Decimal(10, 2)
 }
