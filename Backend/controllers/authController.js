@@ -140,7 +140,7 @@ const registerUser = async (req, res) => {
   }
 };
 
-// 2. Admin Triggers Verification Email (🟢 FIX 2: Protected against SMTP Hangs)
+// 2. Admin Triggers Verification Email (Non-blocking Fix)
 const sendVerificationEmail = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -170,19 +170,14 @@ const sendVerificationEmail = async (req, res) => {
       }
     });
 
-    // Safe Send Mail execution
-    try {
-      await sendVerificationLink(user.email, token);
-      return res.status(200).json({
-        message: `Verification link sent successfully to ${user.email}`
-      });
-    } catch (emailErr) {
-      console.error("Nodemailer Error (Suppressed):", emailErr.message);
-      return res.status(200).json({
-        message: `Token generated for ${user.email}, but email dispatch failed due to network timeout.`,
-        token
-      });
-    }
+    res.status(200).json({
+      message: `Verification token generated! Dispatching email to ${user.email}...`,
+      token
+    });
+
+    sendVerificationLink(user.email, token)
+      .then(() => console.log(`Verification mail sent to ${user.email}`))
+      .catch((err) => console.error("Background Mail Error:", err.message));
 
   } catch (error) {
     console.error("Send Link error:", error);
