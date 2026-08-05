@@ -8,6 +8,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// 1. Email Verification Link යවන Function එක
 const sendVerificationLink = async (toEmail, token) => {
   const clientUrl = process.env.CLIENT_URL || "https://cafeteria-pos-system-lac.vercel.app";
   const verificationUrl = `${clientUrl}/verify-email?token=${token}`;
@@ -28,4 +29,23 @@ const sendVerificationLink = async (toEmail, token) => {
   return await transporter.sendMail(mailOptions);
 };
 
-module.exports = { sendVerificationLink };
+// 2. Password Reset OTP Code එක යවන Function එක
+const sendOtpEmail = async (toEmail, otp) => {
+  const mailOptions = {
+    from: `"Bloom Café POS" <${process.env.EMAIL_USER}>`,
+    to: toEmail,
+    subject: "Password Reset OTP - Bloom Café 🔑",
+    html: `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2>Password Reset Request</h2>
+        <p>Your 6-digit OTP code is:</p>
+        <h1 style="color: #6366f1; letter-spacing: 4px;">${otp}</h1>
+        <p>This OTP will expire in 10 minutes.</p>
+      </div>
+    `
+  };
+
+  return await transporter.sendMail(mailOptions);
+};
+
+module.exports = { sendVerificationLink, sendOtpEmail };
