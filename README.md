@@ -140,7 +140,7 @@ Bloom-Cafe-POS/
 │   ├── uploads/
 │   ├── utils/
 │   ├── package.json
-│   └── server.js
+│   └── index.js
 │
 ├── Frontend/
 │   ├── public/
@@ -164,7 +164,7 @@ Bloom-Cafe-POS/
 ## 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/bloom-cafe-pos.git
+git clone https://github.com/lakkanadulshan/cafeteria-pos-system.git
 
 cd bloom-cafe-pos
 ```
@@ -180,12 +180,6 @@ npm install
 ```
 
 Run the backend server
-
-```bash
-npm run dev
-```
-
-or
 
 ```bash
 npm start
